@@ -10,13 +10,13 @@ Pod::Spec.new do |s|
 
   s.authors      = package['author']
   s.homepage     = package['homepage']
-  s.platform     = :ios, "9.0"
+  s.platform     = :ios, "13.4"
 
   s.source       = { :git => "https://github.com/Swif7ify/react-native-earl-thermal-printer.git", :tag => "v#{s.version}" }
-  s.source_files  = "ios/**/*.{h,m}"
+  s.source_files  = "ios/**/*.{h,m,mm}"
   s.requires_arc = true
   s.ios.vendored_libraries = "ios/PrinterSDK/libPrinterSDK.a"
   s.xcconfig = { 'HEADER_SEARCH_PATHS' => '"${PROJECT_DIR}/PrinterSDK"/**' }
 
-  s.dependency 'React'
+  install_modules_dependencies(s)
 end

@@ -1,27 +1,24 @@
 //
 //  RNBLEPrinter.h
-//  RNThermalReceiptPrinter
+//  react-native-earl-thermal-printer
 //
-//  Created by MTT on 06/10/19.
-//  Copyright © 2019 Facebook. All rights reserved.
+//  Author: Ordovez, Earl Romeo
 //
-#pragma once
-#ifndef RNBLEPrinter_h
-#define RNBLEPrinter_h
 
-#if __has_include("RCTBridgeModule.h")
-#import "RCTBridgeModule.h"
-#else
+#pragma once
+
 #import <React/RCTBridgeModule.h>
-#endif
+#import <React/RCTEventEmitter.h>
 #import <CoreBluetooth/CoreBluetooth.h>
 
-@interface RNBLEPrinter : NSObject <RCTBridgeModule>{
-    NSMutableArray* _printerArray;
-    NSObject* m_printer;
+#ifdef RCT_NEW_ARCH_ENABLED
+#import <RNThermalReceiptPrinterSpec/RNThermalReceiptPrinterSpec.h>
+@interface RNBLEPrinter : RCTEventEmitter <NativeBLEPrinterSpec>
+#else
+@interface RNBLEPrinter : RCTEventEmitter <RCTBridgeModule>
+#endif
+{
+    NSMutableArray *_printerArray;
+    NSObject *m_printer;
 }
 @end
-
-
-
-#endif /* RNBLEPrinter_h */

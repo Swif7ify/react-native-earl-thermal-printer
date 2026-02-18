@@ -1,22 +1,19 @@
 //
 //  RNUSBPrinter.h
-//  RNThermalReceiptPrinter
+//  react-native-earl-thermal-printer
 //
-//  Created by MTT on 06/12/19.
-//  Copyright © 2019 Facebook. All rights reserved.
+//  Author: Ordovez, Earl Romeo
 //
 
-#ifndef RNUSBPrinter_h
-#define RNUSBPrinter_h
+#pragma once
 
-#if __has_include("RCTBridgeModule.h")
-#import "RCTBridgeModule.h"
-#else
 #import <React/RCTBridgeModule.h>
+
+#ifdef RCT_NEW_ARCH_ENABLED
+#import <RNThermalReceiptPrinterSpec/RNThermalReceiptPrinterSpec.h>
+@interface RNUSBPrinter : NSObject <NativeUSBPrinterSpec>
+#else
+@interface RNUSBPrinter : NSObject <RCTBridgeModule>
 #endif
 
-@interface RNUSBPrinter : NSObject <RCTBridgeModule>
-
 @end
-
-#endif /* RNUSBPrinter_h */
