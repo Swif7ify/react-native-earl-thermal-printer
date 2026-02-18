@@ -1,202 +1,397 @@
-import * as React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
-  StyleSheet,
-  View,
-  Text,
-  Button,
-  Picker,
-  TextInput,
+	StyleSheet,
+	View,
+	Text,
+	TouchableOpacity,
+	TextInput,
+	ScrollView,
+	Alert,
+	Platform,
 } from "react-native";
 import {
-  BLEPrinter,
-  NetPrinter,
-  USBPrinter,
-  IUSBPrinter,
-  IBLEPrinter,
-  INetPrinter,
-} from "react-native-thermal-receipt-printer";
+	BLEPrinter,
+	NetPrinter,
+	USBPrinter,
+	NetPrinterEventEmitter,
+	RN_THERMAL_RECEIPT_PRINTER_EVENTS,
+	IUSBPrinter,
+	IBLEPrinter,
+	INetPrinter,
+	PrinterOptions,
+} from "react-native-earl-thermal-printer";
 import Loader from "./Loader";
 
-const printerList: Record<string, any> = {
-  ble: BLEPrinter,
-  net: NetPrinter,
-  usb: USBPrinter,
+type PrinterType = "ble" | "net" | "usb";
+
+const printerList: Record<
+	PrinterType,
+	typeof BLEPrinter | typeof NetPrinter | typeof USBPrinter
+> = {
+	ble: BLEPrinter,
+	net: NetPrinter,
+	usb: USBPrinter,
 };
 
-interface SelectedPrinter
-  extends Partial<IUSBPrinter & IBLEPrinter & INetPrinter> {
-  printerType?: keyof typeof printerList;
-}
-
 export default function App() {
-  const [selectedValue, setSelectedValue] = React.useState<
-    keyof typeof printerList
-  >("ble");
-  const [devices, setDevices] = React.useState([]);
-  const [loading, setLoading] = React.useState<boolean>(false);
-  const [selectedPrinter, setSelectedPrinter] = React.useState<SelectedPrinter>(
-    {}
-  );
+	const [selectedType, setSelectedType] = useState<PrinterType>("ble");
+	const [devices, setDevices] = useState<any[]>([]);
+	const [loading, setLoading] = useState(false);
+	const [connected, setConnected] = useState(false);
+	const [host, setHost] = useState("192.168.1.100");
+	const [port, setPort] = useState("9100");
+	const [customText, setCustomText] = useState(
+		"Hello from Earl Thermal Printer!\n",
+	);
 
-  React.useEffect(() => {
-    const getListDevices = async () => {
-      const Printer = printerList[selectedValue];
-      // get list device for net printers is support scanning in local ip but not recommended
-      if (selectedValue === "net") return;
-      try {
-        setLoading(true);
-        await Printer.init();
-        const results = await Printer.getDeviceList();
-        setDevices(
-          results.map((item: any) => ({ ...item, printerType: selectedValue }))
-        );
-      } catch (err) {
-        console.warn(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    getListDevices();
-  }, [selectedValue]);
+	// ── Init & scan on type change ────────────────────────────────────────
+	useEffect(() => {
+		const initPrinter = async () => {
+			const Printer = printerList[selectedType];
+			if (selectedType === "net") return; // net uses manual IP entry
+			try {
+				setLoading(true);
+				await Printer.init();
+				const results = await Printer.getDeviceList();
+				setDevices(results as any[]);
+			} catch (err: any) {
+				Alert.alert("Init Error", err?.message ?? String(err));
+			} finally {
+				setLoading(false);
+			}
+		};
+		setConnected(false);
+		setDevices([]);
+		initPrinter();
+	}, [selectedType]);
 
-  const handleConnectSelectedPrinter = () => {
-    if (!selectedPrinter) return;
-    const connect = async () => {
-      try {
-        setLoading(true);
-        switch (selectedPrinter.printerType) {
-          case "ble":
-            await BLEPrinter.connectPrinter(
-              selectedPrinter?.inner_mac_address || ""
-            );
-            break;
-          case "net":
-            await NetPrinter.connectPrinter(
-              "192.168.1.100",
-              9100
-            );
-            break;
-          case "usb":
-            await USBPrinter.connectPrinter(
-              selectedPrinter?.vendor_id || "",
-              selectedPrinter?.product_id || ""
-            );
-            break;
-          default:
-        }
-      } catch (err) {
-        console.warn(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    connect();
-  };
+	// ── Net printer events ────────────────────────────────────────────────
+	useEffect(() => {
+		const sub1 = NetPrinterEventEmitter.addListener(
+			RN_THERMAL_RECEIPT_PRINTER_EVENTS.EVENT_NET_PRINTER_SCANNED_SUCCESS,
+			(printers: INetPrinter[]) => {
+				console.log("Discovered net printers:", printers);
+				setDevices(printers);
+			},
+		);
+		const sub2 = NetPrinterEventEmitter.addListener(
+			RN_THERMAL_RECEIPT_PRINTER_EVENTS.EVENT_NET_PRINTER_SCANNING,
+			(isScanning: boolean) => {
+				setLoading(isScanning);
+			},
+		);
+		return () => {
+			sub1.remove();
+			sub2.remove();
+		};
+	}, []);
 
-  const handlePrint = async () => {
-    try {
-      // [options valueForKey:@"imageWidth"];
-      const Printer = printerList[selectedValue];
-      await Printer.printImage("https://howmuch-pk.s3.ap-southeast-1.amazonaws.com/spree/stores/1380/squared_large/logo-for-grocery-store-vector-21609822.jpeg", {imageWidth: 100, paddingX: 300});
-      await Printer.printText("<C>sample text bjhbfhjbdjhfbjfhdvfjdvhjdbfjbjhfdbghjfbgbhjfdgbjfdhbgbjhdfgbjhdfbghjdbghdbjgdhhbgghdjfhbgjdfbgbhjd</C>\n");
-    } catch (err) {
-      console.warn(err);
-    }
-  };
+	// ── Connect ───────────────────────────────────────────────────────────
+	const handleConnect = useCallback(
+		async (device?: any) => {
+			try {
+				setLoading(true);
+				switch (selectedType) {
+					case "ble":
+						if (!device) return;
+						await BLEPrinter.connectPrinter(
+							device.inner_mac_address,
+						);
+						break;
+					case "net":
+						await NetPrinter.init();
+						await NetPrinter.connectPrinter(
+							host,
+							parseInt(port, 10),
+						);
+						break;
+					case "usb":
+						if (!device) return;
+						await USBPrinter.connectPrinter(
+							device.vendor_id,
+							device.product_id,
+						);
+						break;
+				}
+				setConnected(true);
+				Alert.alert("Connected", "Printer connected successfully");
+			} catch (err: any) {
+				Alert.alert("Connection Error", err?.message ?? String(err));
+			} finally {
+				setLoading(false);
+			}
+		},
+		[selectedType, host, port],
+	);
 
-  const handleChangePrinterType = async (type: keyof typeof printerList) => {
-    setSelectedValue((prev) => {
-      printerList[prev].closeConn();
-      return type;
-    });
-    setSelectedPrinter({});
-  };
+	// ── Print actions ─────────────────────────────────────────────────────
+	const handlePrintText = useCallback(async () => {
+		try {
+			const Printer = printerList[selectedType];
+			await Printer.printText(customText);
+			Alert.alert("Printed", "Text sent to printer");
+		} catch (err: any) {
+			Alert.alert("Print Error", err?.message ?? String(err));
+		}
+	}, [selectedType, customText]);
 
-  const handleChangeHostAndPort = (params: string) => (text: string) =>
-    setSelectedPrinter((prev) => ({
-      ...prev,
-      device_name: "Net Printer",
-      [params]: text,
-      printerType: "net",
-    }));
+	const handlePrintBill = useCallback(async () => {
+		try {
+			const Printer = printerList[selectedType];
+			await Printer.printBill(
+				"<C><B>EARL THERMAL PRINTER</B></C>\n" +
+					"================================\n" +
+					"Item 1                    $5.00\n" +
+					"Item 2                    $3.50\n" +
+					"Item 3                    $7.25\n" +
+					"================================\n" +
+					"<B>TOTAL                  $15.75</B>\n" +
+					"\n" +
+					"<C>Thank you!</C>\n",
+			);
+			Alert.alert("Printed", "Bill sent to printer");
+		} catch (err: any) {
+			Alert.alert("Print Error", err?.message ?? String(err));
+		}
+	}, [selectedType]);
 
-  const _renderNet = () => (
-    <View style={{ paddingVertical: 16 }}>
-      <View style={styles.rowDirection}>
-        <Text>Host: </Text>
-        <TextInput
-          placeholder="192.168.100.19"
-          onChangeText={handleChangeHostAndPort("host")}
-        />
-      </View>
-      <View style={styles.rowDirection}>
-        <Text>Port: </Text>
-        <TextInput
-          placeholder="9100"
-          onChangeText={handleChangeHostAndPort("port")}
-        />
-      </View>
-    </View>
-  );
+	const handlePrintQr = useCallback(async () => {
+		try {
+			const Printer = printerList[selectedType];
+			await Printer.printQrCode(
+				"https://github.com/Swif7ify/react-native-earl-thermal-printer",
+			);
+			Alert.alert("Printed", "QR code sent to printer");
+		} catch (err: any) {
+			Alert.alert("Print Error", err?.message ?? String(err));
+		}
+	}, [selectedType]);
 
-  const _renderOther = () => (
-    <Picker selectedValue={selectedPrinter} onValueChange={setSelectedPrinter}>
-      {devices.map((item: any, index) => (
-        <Picker.Item
-          label={item.device_name}
-          value={item}
-          key={`printer-item-${index}`}
-        />
-      ))}
-    </Picker>
-  );
+	const handleDisconnect = useCallback(() => {
+		printerList[selectedType].closeConn();
+		setConnected(false);
+	}, [selectedType]);
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.section}>
-        <Text>Select printer type: </Text>
-        <Picker
-          selectedValue={selectedValue}
-          onValueChange={handleChangePrinterType}
-        >
-          {Object.keys(printerList).map((item, index) => (
-            <Picker.Item
-              label={item.toUpperCase()}
-              value={item}
-              key={`printer-type-item-${index}`}
-            />
-          ))}
-        </Picker>
-      </View>
-      <View style={styles.section}>
-        <Text>Select printer: </Text>
-        {selectedValue === "net" ? _renderNet() : _renderOther()}
-      </View>
-      <Button
-        disabled={!selectedPrinter?.device_name}
-        title="Connect"
-        onPress={handleConnectSelectedPrinter}
-      />
-      <Button
-        disabled={!selectedPrinter?.device_name}
-        title="Print sample"
-        onPress={handlePrint}
-      />
-     
-    </View>
-  );
+	// ── Render ────────────────────────────────────────────────────────────
+	return (
+		<ScrollView contentContainerStyle={styles.container}>
+			<Loader loading={loading} />
+
+			<Text style={styles.title}>Earl Thermal Printer</Text>
+			<Text style={styles.subtitle}>New Architecture Example</Text>
+
+			{/* Printer type selector */}
+			<Text style={styles.label}>Printer Type</Text>
+			<View style={styles.row}>
+				{(["ble", "net", "usb"] as PrinterType[]).map((type) => (
+					<TouchableOpacity
+						key={type}
+						style={[
+							styles.typeBtn,
+							selectedType === type && styles.typeBtnActive,
+						]}
+						onPress={() => setSelectedType(type)}
+					>
+						<Text
+							style={[
+								styles.typeBtnText,
+								selectedType === type &&
+									styles.typeBtnTextActive,
+							]}
+						>
+							{type.toUpperCase()}
+						</Text>
+					</TouchableOpacity>
+				))}
+			</View>
+
+			{/* Device list / manual input */}
+			{selectedType === "net" ? (
+				<View style={styles.section}>
+					<Text style={styles.label}>Host</Text>
+					<TextInput
+						style={styles.input}
+						value={host}
+						onChangeText={setHost}
+						placeholder="192.168.1.100"
+					/>
+					<Text style={styles.label}>Port</Text>
+					<TextInput
+						style={styles.input}
+						value={port}
+						onChangeText={setPort}
+						placeholder="9100"
+						keyboardType="numeric"
+					/>
+					<TouchableOpacity
+						style={styles.btn}
+						onPress={() => handleConnect()}
+					>
+						<Text style={styles.btnText}>Connect</Text>
+					</TouchableOpacity>
+				</View>
+			) : (
+				<View style={styles.section}>
+					<Text style={styles.label}>
+						Devices ({devices.length} found)
+					</Text>
+					{devices.map((device, idx) => (
+						<TouchableOpacity
+							key={idx}
+							style={styles.deviceItem}
+							onPress={() => handleConnect(device)}
+						>
+							<Text style={styles.deviceText}>
+								{device.device_name ||
+									device.inner_mac_address ||
+									"Unknown"}
+							</Text>
+						</TouchableOpacity>
+					))}
+					{devices.length === 0 && (
+						<Text style={styles.hint}>
+							No devices found. Make sure printer is on and
+							paired.
+						</Text>
+					)}
+				</View>
+			)}
+
+			{/* Connected actions */}
+			{connected && (
+				<View style={styles.section}>
+					<Text style={[styles.label, { color: "#2e7d32" }]}>
+						Connected
+					</Text>
+
+					<Text style={styles.label}>Custom Text</Text>
+					<TextInput
+						style={[styles.input, { height: 80 }]}
+						value={customText}
+						onChangeText={setCustomText}
+						multiline
+					/>
+
+					<TouchableOpacity
+						style={styles.btn}
+						onPress={handlePrintText}
+					>
+						<Text style={styles.btnText}>Print Text</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={styles.btn}
+						onPress={handlePrintBill}
+					>
+						<Text style={styles.btnText}>Print Sample Bill</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={styles.btn}
+						onPress={handlePrintQr}
+					>
+						<Text style={styles.btnText}>Print QR Code</Text>
+					</TouchableOpacity>
+
+					<TouchableOpacity
+						style={[styles.btn, styles.btnDanger]}
+						onPress={handleDisconnect}
+					>
+						<Text style={styles.btnText}>Disconnect</Text>
+					</TouchableOpacity>
+				</View>
+			)}
+		</ScrollView>
+	);
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 16,
-  },
-  section: {
-    flex: 1,
-  },
-  rowDirection: {
-    flexDirection: "row",
-  },
+	container: {
+		flexGrow: 1,
+		padding: 20,
+		paddingTop: Platform.OS === "ios" ? 60 : 40,
+		backgroundColor: "#f5f5f5",
+	},
+	title: {
+		fontSize: 24,
+		fontWeight: "bold",
+		textAlign: "center",
+		marginBottom: 4,
+	},
+	subtitle: {
+		fontSize: 14,
+		color: "#666",
+		textAlign: "center",
+		marginBottom: 24,
+	},
+	label: {
+		fontSize: 14,
+		fontWeight: "600",
+		marginBottom: 6,
+		marginTop: 12,
+	},
+	row: {
+		flexDirection: "row",
+		gap: 8,
+	},
+	typeBtn: {
+		flex: 1,
+		paddingVertical: 10,
+		borderRadius: 8,
+		backgroundColor: "#e0e0e0",
+		alignItems: "center",
+	},
+	typeBtnActive: {
+		backgroundColor: "#1976d2",
+	},
+	typeBtnText: {
+		fontWeight: "600",
+		color: "#333",
+	},
+	typeBtnTextActive: {
+		color: "#fff",
+	},
+	section: {
+		marginTop: 16,
+	},
+	input: {
+		borderWidth: 1,
+		borderColor: "#ccc",
+		borderRadius: 8,
+		padding: 10,
+		backgroundColor: "#fff",
+		fontSize: 16,
+		marginBottom: 8,
+	},
+	btn: {
+		backgroundColor: "#1976d2",
+		paddingVertical: 12,
+		borderRadius: 8,
+		alignItems: "center",
+		marginTop: 8,
+	},
+	btnDanger: {
+		backgroundColor: "#c62828",
+	},
+	btnText: {
+		color: "#fff",
+		fontWeight: "600",
+		fontSize: 16,
+	},
+	deviceItem: {
+		padding: 12,
+		backgroundColor: "#fff",
+		borderRadius: 8,
+		marginBottom: 6,
+		borderWidth: 1,
+		borderColor: "#ddd",
+	},
+	deviceText: {
+		fontSize: 14,
+	},
+	hint: {
+		color: "#999",
+		fontStyle: "italic",
+		marginTop: 8,
+	},
 });

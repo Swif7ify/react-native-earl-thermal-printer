@@ -2,6 +2,8 @@
 
 A React Native library for USB, Bluetooth (BLE), and Network (TCP/IP) thermal receipt printers.
 
+A modern, high-performance thermal printer library for React Native. Built with the New Architecture (TurboModules) for synchronous communication, zero legacy bridge overhead, and Android 12+ Bluetooth compliance.
+
 Built for the **React Native New Architecture** (TurboModules / Codegen). Supports Android and iOS.
 
 ---

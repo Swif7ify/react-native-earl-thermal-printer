@@ -1,21 +1,21 @@
 {
-  "compilerOptions": {
-    "allowJs": true,
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "jsx": "react",
-    "lib": ["es6"],
-    "moduleResolution": "node",
-    "noEmit": true,
-    "strict": true,
-    "target": "esnext",
-    "baseUrl": ".", // This must be specified if "paths" is.
-    "paths": {
-      "react-native-thermal-receipt-printer": ["../src/index.ts"] // This mapping is relative to "baseUrl"
-    },
-    "typeRoots": ["./node_modules/@types/"]
-  },
-  "include": ["src"],
-  "exclude": ["node_modules", "babel.config.js", "metro.config.js"]
+	"compilerOptions": {
+		"allowJs": true,
+		"allowSyntheticDefaultImports": true,
+		"esModuleInterop": true,
+		"isolatedModules": true,
+		"jsx": "react-jsx",
+		"lib": ["es2020"],
+		"moduleResolution": "node",
+		"noEmit": true,
+		"strict": true,
+		"target": "esnext",
+		"baseUrl": ".",
+		"paths": {
+			"react-native-earl-thermal-printer": ["../src/index.ts"]
+		},
+		"typeRoots": ["./node_modules/@types/"]
+	},
+	"include": ["src"],
+	"exclude": ["node_modules", "babel.config.js", "metro.config.js"]
 }

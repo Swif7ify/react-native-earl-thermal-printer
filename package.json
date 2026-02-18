@@ -60,6 +60,11 @@
 		"typescript": "^5.3.0"
 	},
 	"author": "Ordovez, Earl Romeo",
+	"funding": {
+		"type": "github",
+		"url": "https://github.com/sponsors/Swif7ify"
+	},
 	"homepage": "https://github.com/Swif7ify/react-native-earl-thermal-printer#readme",
+	"bugs": "https://github.com/Swif7ify/react-native-earl-thermal-printer/issues",
 	"license": "ISC"
 }

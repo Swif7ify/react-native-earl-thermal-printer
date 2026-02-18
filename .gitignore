@@ -38,6 +38,7 @@ build/
 .gradle
 local.properties
 *.iml
+dist/
 
 # BUCK
 buck-out/
@@ -46,3 +47,4 @@ buck-out/
       
 # tgz
 *.tgz
+
