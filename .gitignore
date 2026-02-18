@@ -39,6 +39,16 @@ build/
 local.properties
 *.iml
 dist/
+.cxx/
+
+# Example build artifacts
+example/android/app/.cxx/
+example/android/.gradle/
+example/android/app/build/
+example/android/build/
+example/ios/build/
+example/ios/Pods/
+example/ios/*.xcworkspace/
 
 # BUCK
 buck-out/
@@ -47,6 +57,3 @@ buck-out/
       
 # tgz
 *.tgz
-
-android/
-ios/

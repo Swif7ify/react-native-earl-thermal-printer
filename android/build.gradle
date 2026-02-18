@@ -1,0 +1,30 @@
+apply plugin: 'com.android.library'
+apply plugin: 'com.facebook.react'
+
+android {
+    namespace = "com.pinmi.react.printer"
+    compileSdkVersion = 34
+
+    defaultConfig {
+        minSdkVersion 21
+        targetSdkVersion 34
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = ['src/main/java']
+        }
+    }
+}
+
+dependencies {
+    implementation 'com.facebook.react:react-android'
+    implementation 'com.google.zxing:core:3.5.2'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+}

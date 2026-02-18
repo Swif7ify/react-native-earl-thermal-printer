@@ -1,8 +1,11 @@
 # react-native-earl-thermal-printer
 
-A React Native library for USB, Bluetooth (BLE), and Network (TCP/IP) thermal receipt printers.
+![GitHub stars](https://img.shields.io/github/stars/Swif7ify/react-native-earl-thermal-printer?style=social)
+![npm](https://img.shields.io/npm/v/react-native-earl-thermal-printer)
+![downloads](https://img.shields.io/npm/dm/react-native-earl-thermal-printer)
+![license](https://img.shields.io/npm/l/react-native-earl-thermal-printer)
 
-A modern, high-performance thermal printer library for React Native. Built with the New Architecture (TurboModules) for synchronous communication, zero legacy bridge overhead, and Android 12+ Bluetooth compliance.
+A React Native library for USB, Bluetooth (BLE), and Network (TCP/IP) thermal receipt printers. Modern, high-performance thermal printer library for React Native. Built with the New Architecture (TurboModules) for synchronous communication, zero legacy bridge overhead, and Android 12+ Bluetooth compliance.
 
 Built for the **React Native New Architecture** (TurboModules / Codegen). Supports Android and iOS.
 
@@ -414,6 +417,45 @@ const styles = StyleSheet.create({
 	printArea: { marginTop: 20, alignItems: "center" },
 });
 ```
+
+---
+
+## Running the Example
+
+A working example app lives in the `example/` directory.
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) (>= 18)
+- [Yarn](https://classic.yarnpkg.com/) (v1) — required because the example uses `link:..`
+- Android Studio with an emulator or a physical device (USB debugging enabled)
+- For iOS: Xcode with CocoaPods
+
+### Setup & Run
+
+```bash
+# 1. Install root dependencies
+yarn install
+
+# 2. Install example dependencies
+cd example
+yarn install
+
+# 3. Run on Android
+yarn android
+
+# 4. (iOS) Install pods, then run
+cd ios && pod install && cd ..
+yarn ios
+```
+
+> **Windows users:** If the build fails with a `mkdir` / path error, the project path is too long for CMake. Use `subst` to shorten it:
+>
+> ```powershell
+> subst P: "C:\path\to\react-native-thermal-receipt-printer"
+> cd P:\example\android
+> .\gradlew.bat app:assembleDebug
+> ```
 
 ---
 
