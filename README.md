@@ -265,6 +265,158 @@ Add these permissions to your `AndroidManifest.xml`:
 
 ---
 
+## Example
+
+```tsx
+import React, { useEffect, useState } from "react";
+import {
+	Alert,
+	Button,
+	FlatList,
+	PermissionsAndroid,
+	Platform,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
+} from "react-native";
+import { BLEPrinter, IBLEPrinter } from "react-native-earl-thermal-printer";
+
+export default function ThermalPrinterTest() {
+	const [printers, setPrinters] = useState<IBLEPrinter[]>([]);
+	const [currentPrinter, setCurrentPrinter] = useState<IBLEPrinter | null>(
+		null,
+	);
+
+	useEffect(() => {
+		BLEPrinter.init()
+			.then(() => {
+				console.log("Printer initialized");
+			})
+			.catch((err) => {
+				console.warn("Init failed:", err);
+			});
+	}, []);
+
+	const requestPermissions = async () => {
+		if (Platform.OS === "android") {
+			try {
+				const granted = await PermissionsAndroid.requestMultiple([
+					PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+					PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+					PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+				]);
+				if (
+					granted["android.permission.BLUETOOTH_CONNECT"] ===
+					PermissionsAndroid.RESULTS.GRANTED
+				) {
+					scanDevices();
+				} else {
+					Alert.alert("Permission denied");
+				}
+			} catch (err) {
+				console.warn(err);
+			}
+		} else {
+			scanDevices();
+		}
+	};
+
+	const scanDevices = () => {
+		BLEPrinter.getDeviceList()
+			.then(setPrinters)
+			.catch((err) => Alert.alert("Scan Failed", String(err)));
+	};
+
+	const connectPrinter = (printer: IBLEPrinter) => {
+		BLEPrinter.connectPrinter(printer.inner_mac_address)
+			.then((connected) => {
+				setCurrentPrinter(connected);
+				Alert.alert(
+					"Connected",
+					`Connected to ${connected.device_name}`,
+				);
+			})
+			.catch((err) => Alert.alert("Connection Failed", String(err)));
+	};
+
+	const printTicket = async () => {
+		if (!currentPrinter) {
+			Alert.alert("No Printer", "Please connect to a printer first.");
+			return;
+		}
+
+		try {
+			// To print a QR code:
+			await BLEPrinter.printQrCode("ZAM-OC-0001");
+			// Print formatted receipt text (beeps + cuts automatically)
+			const bill =
+				"--------------------------------\n" +
+				"Item 1               $10.00\n" +
+				"Item 2               $20.00\n" +
+				"--------------------------------\n" +
+				"<B>TOTAL              $30.00</B>\n\n\n";
+
+			await BLEPrinter.printBill(bill);
+
+			// To print an image from URL:
+			// await BLEPrinter.printImage(
+			// 	"https://images.unsplash.com/photo-1771258052747-52e19364185f?q=80&w=765&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+			// );
+		} catch (err) {
+			console.warn("Print error:", err);
+			Alert.alert("Print Error", String(err));
+		}
+	};
+
+	return (
+		<View style={styles.container}>
+			<Button title="Scan for Printers" onPress={requestPermissions} />
+
+			<FlatList
+				data={printers}
+				keyExtractor={(item) => item.inner_mac_address}
+				renderItem={({ item }) => (
+					<TouchableOpacity
+						style={styles.deviceItem}
+						onPress={() => connectPrinter(item)}
+					>
+						<Text>{item.device_name || "Unknown Device"}</Text>
+						<Text style={styles.subText}>
+							{item.inner_mac_address}
+						</Text>
+					</TouchableOpacity>
+				)}
+				style={{ maxHeight: 200, marginVertical: 20 }}
+			/>
+
+			<View style={styles.printArea}>
+				<Text style={{ marginBottom: 10 }}>
+					Status:{" "}
+					{currentPrinter
+						? `Connected to ${currentPrinter.device_name}`
+						: "Disconnected"}
+				</Text>
+				<Button
+					title="Print Test Receipt"
+					onPress={printTicket}
+					disabled={!currentPrinter}
+				/>
+			</View>
+		</View>
+	);
+}
+
+const styles = StyleSheet.create({
+	container: { flex: 1, padding: 40, paddingTop: 60 },
+	deviceItem: { padding: 10, borderBottomWidth: 1, borderColor: "#ccc" },
+	subText: { fontSize: 10, color: "#666" },
+	printArea: { marginTop: 20, alignItems: "center" },
+});
+```
+
+---
+
 ## New Architecture
 
 This library is built for the React Native **New Architecture** using TurboModules and Codegen. It requires:

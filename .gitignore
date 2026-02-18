@@ -48,3 +48,5 @@ buck-out/
 # tgz
 *.tgz
 
+android/
+ios/
