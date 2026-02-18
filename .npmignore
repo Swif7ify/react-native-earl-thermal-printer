@@ -1,0 +1,33 @@
+# Directories
+example/
+Example/
+.git/
+.idea/
+.gradle/
+.settings/
+android/.gradle/
+android/.settings/
+node_modules/
+
+# Build outputs (dist is included via files in package.json)
+*.tgz
+
+# IDE & OS files
+.gitignore
+.classpath
+.project
+*.iml
+.DS_Store
+Thumbs.db
+
+# Dev config
+tsconfig.json
+babel.config.js
+.eslintrc*
+.prettierrc*
+
+# Tests
+android/src/androidTest/
+android/src/test/
+__tests__/
+jest.config.*
