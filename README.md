@@ -73,6 +73,8 @@ const devices = await USBPrinter.getDeviceList();
 await USBPrinter.connectPrinter(devices[0].vendor_id, devices[0].product_id);
 await USBPrinter.printText("Hello from USB!\n");
 await USBPrinter.printBill("Receipt line\n");
+await USBPrinter.printImage("https://example.com/logo.png", 300);
+await USBPrinter.printQrCode("https://example.com", 200);
 USBPrinter.closeConn();
 ```
 
@@ -84,6 +86,8 @@ const devices = await BLEPrinter.getDeviceList();
 await BLEPrinter.connectPrinter(devices[0].inner_mac_address);
 await BLEPrinter.printText("Hello from BLE!\n");
 await BLEPrinter.printBill("Receipt line\n");
+await BLEPrinter.printImage("https://example.com/logo.png", 300);
+await BLEPrinter.printQrCode("https://example.com", 200);
 BLEPrinter.closeConn();
 ```
 
@@ -102,6 +106,8 @@ const devices = await NetPrinter.getDeviceList();
 await NetPrinter.connectPrinter("192.168.1.100", 9100);
 await NetPrinter.printText("Hello from Network!\n");
 await NetPrinter.printBill("Receipt line\n");
+await NetPrinter.printImage("https://example.com/logo.png", 300);
+await NetPrinter.printQrCode("https://example.com", 200);
 NetPrinter.closeConn();
 ```
 
@@ -137,13 +143,13 @@ Print a text string using ESC/POS encoding. Supports formatting tags (see below)
 
 Same as `printText` but defaults `beep`, `cut`, and `tailingLine` to `true`.
 
-### `printImage(imageUrl: string): Promise<void>`
+### `printImage(imageUrl: string, imageWidth?: number): Promise<void>`
 
-Print an image from a URL.
+Print an image from a URL. The optional `imageWidth` parameter controls the maximum width in pixels for the printed image (default: `200` on Android, `150` on iOS).
 
-### `printQrCode(qrCode: string): Promise<void>`
+### `printQrCode(qrCode: string, qrSize?: number): Promise<void>`
 
-Print a QR code.
+Print a QR code. The optional `qrSize` parameter controls the size in pixels of the generated QR code (default: `250`).
 
 ### `closeConn(): void`
 
@@ -351,7 +357,7 @@ export default function ThermalPrinterTest() {
 
 		try {
 			// To print a QR code:
-			await BLEPrinter.printQrCode("ZAM-OC-0001");
+			await BLEPrinter.printQrCode("ZAM-OC-0001", 100); // qrSize
 			// Print formatted receipt text (beeps + cuts automatically)
 			const bill =
 				"--------------------------------\n" +
@@ -364,8 +370,9 @@ export default function ThermalPrinterTest() {
 
 			// To print an image from URL:
 			// await BLEPrinter.printImage(
-			// 	"https://images.unsplash.com/photo-1771258052747-52e19364185f?q=80&w=765&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-			// );
+				"https://images.unsplash.com/photo-1771258052747-52e19364185f?q=80&w=765&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+				300, // imageWidth
+			);
 		} catch (err) {
 			console.warn("Print error:", err);
 			Alert.alert("Print Error", String(err));

@@ -17,8 +17,8 @@ public interface RNPrinterModule {
 
     void printRawData(String base64Data, Promise promise);
 
-    void printImageData(String imageUrl, Promise promise);
+    void printImageData(String imageUrl, double imageWidth, Promise promise);
 
-    void printQrCode(String qrCode, Promise promise);
+    void printQrCode(String qrCode, double qrSize, Promise promise);
 }
 

@@ -131,6 +131,7 @@ RCT_EXPORT_METHOD(printRawData:(NSString *)base64Data
 }
 
 RCT_EXPORT_METHOD(printImageData:(NSString *)imageUrl
+                  imageWidth:(double)imageWidth
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 {
@@ -139,11 +140,12 @@ RCT_EXPORT_METHOD(printImageData:(NSString *)imageUrl
             reject(@"ERR_NO_CONN", @"Not connected to a printer", nil);
             return;
         }
+        CGFloat width = imageWidth > 0 ? (CGFloat)imageWidth : 150;
         NSURL *url = [NSURL URLWithString:imageUrl];
         NSData *imageData = [NSData dataWithContentsOfURL:url];
         if (imageData != nil) {
             UIImage *image = [UIImage imageWithData:imageData];
-            UIImage *printImage = [self getPrintImage:image width:150 paddingX:250];
+            UIImage *printImage = [self getPrintImage:image width:width paddingX:250];
             [[PrinterSDK defaultPrinterSDK] setPrintWidth:576];
             [[PrinterSDK defaultPrinterSDK] printImage:printImage];
             resolve(nil);
@@ -156,6 +158,7 @@ RCT_EXPORT_METHOD(printImageData:(NSString *)imageUrl
 }
 
 RCT_EXPORT_METHOD(printQrCode:(NSString *)qrCode
+                  qrSize:(double)qrSize
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 {

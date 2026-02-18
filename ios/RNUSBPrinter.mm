@@ -51,6 +51,7 @@ RCT_EXPORT_METHOD(printRawData:(NSString *)base64Data
 }
 
 RCT_EXPORT_METHOD(printImageData:(NSString *)imageUrl
+                  imageWidth:(double)imageWidth
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 {
@@ -58,6 +59,7 @@ RCT_EXPORT_METHOD(printImageData:(NSString *)imageUrl
 }
 
 RCT_EXPORT_METHOD(printQrCode:(NSString *)qrCode
+                  qrSize:(double)qrSize
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 {

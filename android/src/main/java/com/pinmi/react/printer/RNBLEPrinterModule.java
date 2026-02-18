@@ -65,14 +65,14 @@ public class RNBLEPrinterModule extends NativeBLEPrinterSpec implements RNPrinte
 
     @Override
     @ReactMethod
-    public void printImageData(String imageUrl, Promise promise) {
-        adapter.printImageData(imageUrl, promise);
+    public void printImageData(String imageUrl, double imageWidth, Promise promise) {
+        adapter.printImageData(imageUrl, imageWidth, promise);
     }
 
     @Override
     @ReactMethod
-    public void printQrCode(String qrCode, Promise promise) {
-        adapter.printQrCode(qrCode, promise);
+    public void printQrCode(String qrCode, double qrSize, Promise promise) {
+        adapter.printQrCode(qrCode, qrSize, promise);
     }
 
     @Override

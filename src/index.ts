@@ -83,11 +83,11 @@ export const USBPrinter = {
 	printBill: (text: string, opts: PrinterOptions = {}): Promise<void> =>
 		NativeUSBPrinterModule.printRawData(billTo64Buffer(text, opts)),
 
-	printImage: (imageUrl: string): Promise<void> =>
-		NativeUSBPrinterModule.printImageData(imageUrl),
+	printImage: (imageUrl: string, imageWidth: number = 200): Promise<void> =>
+		NativeUSBPrinterModule.printImageData(imageUrl, imageWidth),
 
-	printQrCode: (qrCode: string): Promise<void> =>
-		NativeUSBPrinterModule.printQrCode(qrCode),
+	printQrCode: (qrCode: string, qrSize: number = 250): Promise<void> =>
+		NativeUSBPrinterModule.printQrCode(qrCode, qrSize),
 };
 
 // ── BLE Printer ─────────────────────────────────────────────────────────────
@@ -111,11 +111,11 @@ export const BLEPrinter = {
 	printBill: (text: string, opts: PrinterOptions = {}): Promise<void> =>
 		NativeBLEPrinterModule.printRawData(billTo64Buffer(text, opts)),
 
-	printImage: (imageUrl: string): Promise<void> =>
-		NativeBLEPrinterModule.printImageData(imageUrl),
+	printImage: (imageUrl: string, imageWidth: number = 200): Promise<void> =>
+		NativeBLEPrinterModule.printImageData(imageUrl, imageWidth),
 
-	printQrCode: (qrCode: string): Promise<void> =>
-		NativeBLEPrinterModule.printQrCode(qrCode),
+	printQrCode: (qrCode: string, qrSize: number = 250): Promise<void> =>
+		NativeBLEPrinterModule.printQrCode(qrCode, qrSize),
 };
 
 // ── Net Printer ─────────────────────────────────────────────────────────────
@@ -140,11 +140,11 @@ export const NetPrinter = {
 	printBill: (text: string, opts: PrinterOptions = {}): Promise<void> =>
 		NativeNetPrinterModule.printRawData(billTo64Buffer(text, opts)),
 
-	printImage: (imageUrl: string): Promise<void> =>
-		NativeNetPrinterModule.printImageData(imageUrl),
+	printImage: (imageUrl: string, imageWidth: number = 200): Promise<void> =>
+		NativeNetPrinterModule.printImageData(imageUrl, imageWidth),
 
-	printQrCode: (qrCode: string): Promise<void> =>
-		NativeNetPrinterModule.printQrCode(qrCode),
+	printQrCode: (qrCode: string, qrSize: number = 250): Promise<void> =>
+		NativeNetPrinterModule.printQrCode(qrCode, qrSize),
 };
 
 // ── Events ──────────────────────────────────────────────────────────────────

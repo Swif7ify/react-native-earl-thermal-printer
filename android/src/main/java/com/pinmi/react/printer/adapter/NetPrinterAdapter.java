@@ -250,7 +250,7 @@ public class NetPrinterAdapter implements PrinterAdapter {
     }
 
     @Override
-    public void printImageData(final String imageUrl, Promise promise) {
+    public void printImageData(final String imageUrl, double imageWidth, Promise promise) {
         final Bitmap bitmapImage = getBitmapFromURL(imageUrl);
 
         if (bitmapImage == null) {
@@ -264,9 +264,10 @@ public class NetPrinterAdapter implements PrinterAdapter {
         }
 
         final Socket socket = this.mSocket;
+        final int maxSize = imageWidth > 0 ? (int) imageWidth : 200;
 
         try {
-            int[][] pixels = getPixelsSlow(bitmapImage);
+            int[][] pixels = getPixelsSlow(bitmapImage, maxSize);
             OutputStream printerOutputStream = socket.getOutputStream();
 
             printerOutputStream.write(SET_LINE_SPACE_24);
@@ -293,8 +294,9 @@ public class NetPrinterAdapter implements PrinterAdapter {
     }
 
     @Override
-    public void printQrCode(String qrCode, Promise promise) {
-        final Bitmap bitmapImage = TextToQrImageEncode(qrCode);
+    public void printQrCode(String qrCode, double qrSize, Promise promise) {
+        final int size = qrSize > 0 ? (int) qrSize : 250;
+        final Bitmap bitmapImage = TextToQrImageEncode(qrCode, size);
 
         if (bitmapImage == null) {
             promise.reject("ERR_QR", "QR code generation failed");
@@ -309,7 +311,7 @@ public class NetPrinterAdapter implements PrinterAdapter {
         final Socket socket = this.mSocket;
 
         try {
-            int[][] pixels = getPixelsSlow(bitmapImage);
+            int[][] pixels = getPixelsSlow(bitmapImage, size);
             OutputStream printerOutputStream = socket.getOutputStream();
 
             printerOutputStream.write(SET_LINE_SPACE_24);
@@ -335,14 +337,14 @@ public class NetPrinterAdapter implements PrinterAdapter {
         }
     }
 
-    private Bitmap TextToQrImageEncode(String Value) {
+    private Bitmap TextToQrImageEncode(String Value, int size) {
         com.google.zxing.Writer writer = new QRCodeWriter();
         BitMatrix bitMatrix = null;
         try {
-            bitMatrix = writer.encode(Value, com.google.zxing.BarcodeFormat.QR_CODE, 250, 250,
+            bitMatrix = writer.encode(Value, com.google.zxing.BarcodeFormat.QR_CODE, size, size,
                     ImmutableMap.of(EncodeHintType.MARGIN, 1));
-            int width = 250;
-            int height = 250;
+            int width = size;
+            int height = size;
             Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
 
             for (int i = 0; i < width; i++) {
@@ -356,8 +358,8 @@ public class NetPrinterAdapter implements PrinterAdapter {
         }
     }
 
-    public static int[][] getPixelsSlow(Bitmap image2) {
-        Bitmap image = resizeTheImageForPrinting(image2);
+    public static int[][] getPixelsSlow(Bitmap image2, int maxSize) {
+        Bitmap image = resizeTheImageForPrinting(image2, maxSize);
         int width = image.getWidth();
         int height = image.getHeight();
         int[][] result = new int[height][width];
@@ -402,15 +404,15 @@ public class NetPrinterAdapter implements PrinterAdapter {
         return luminance < threshold;
     }
 
-    public static Bitmap resizeTheImageForPrinting(Bitmap image) {
+    public static Bitmap resizeTheImageForPrinting(Bitmap image, int maxSize) {
         int width = image.getWidth();
         int height = image.getHeight();
-        if (width > 200 || height > 200) {
+        if (width > maxSize || height > maxSize) {
             if (width > height) {
-                float decreaseSizeBy = (200.0f / width);
+                float decreaseSizeBy = ((float) maxSize / width);
                 return getBitmapResized(image, decreaseSizeBy);
             } else {
-                float decreaseSizeBy = (200.0f / height);
+                float decreaseSizeBy = ((float) maxSize / height);
                 return getBitmapResized(image, decreaseSizeBy);
             }
         }

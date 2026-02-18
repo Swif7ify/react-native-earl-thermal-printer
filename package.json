@@ -1,6 +1,6 @@
 {
 	"name": "react-native-earl-thermal-printer",
-	"version": "1.0.1",
+	"version": "1.1.0",
 	"description": "A modern, high-performance thermal printer library for React Native. Built with the New Architecture (TurboModules) for synchronous communication, zero legacy bridge overhead, and Android 12+ Bluetooth compliance.",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",

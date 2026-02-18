@@ -7,8 +7,8 @@ export interface Spec extends TurboModule {
 	connectPrinter(vendorId: number, productId: number): Promise<Object>;
 	closeConn(): void;
 	printRawData(base64Data: string): Promise<void>;
-	printImageData(imageUrl: string): Promise<void>;
-	printQrCode(qrCode: string): Promise<void>;
+	printImageData(imageUrl: string, imageWidth: number): Promise<void>;
+	printQrCode(qrCode: string, qrSize: number): Promise<void>;
 }
 
 export default TurboModuleRegistry.getEnforcing<Spec>("RNUSBPrinter");

@@ -7,8 +7,8 @@ export interface Spec extends TurboModule {
 	connectPrinter(innerAddress: string): Promise<Object>;
 	closeConn(): void;
 	printRawData(base64Data: string): Promise<void>;
-	printImageData(imageUrl: string): Promise<void>;
-	printQrCode(qrCode: string): Promise<void>;
+	printImageData(imageUrl: string, imageWidth: number): Promise<void>;
+	printQrCode(qrCode: string, qrSize: number): Promise<void>;
 	addListener(eventName: string): void;
 	removeListeners(count: number): void;
 }
