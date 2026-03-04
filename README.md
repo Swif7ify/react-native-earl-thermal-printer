@@ -172,26 +172,111 @@ interface PrinterOptions {
 
 ## ESC/POS Formatting Tags
 
-The text helpers (`printText`, `printBill`) support inline formatting tags:
+The text helpers (`printText`, `printBill`) support inline formatting tags.
+All formatting **resets automatically on every `\n`** (newline), so tags apply per-line.
 
-| Tag            | Description            |
-| -------------- | ---------------------- |
-| `<B>...</B>`   | **Bold**               |
-| `<C>...</C>`   | Center-aligned         |
-| `<D>...</D>`   | Double-width           |
-| `<DB>...</DB>` | Double-width bold      |
-| `<M>...</M>`   | Medium (double-height) |
+### Text Style
 
-Example:
+| Tag                    | Description                                          |
+| ---------------------- | ---------------------------------------------------- |
+| `<BOLD>...</BOLD>`     | Bold / emphasis (no size change)                     |
+| `<U>...</U>`           | Underline (1-dot thin)                               |
+| `<U2>...</U2>`         | Underline (2-dot thick)                              |
+| `<REV>...</REV>`       | Reverse (white text on black background)             |
+| `<UPDOWN>...</UPDOWN>` | Upside-down printing                                 |
+
+### Font Selection
+
+| Tag         | Description                                             |
+| ----------- | ------------------------------------------------------- |
+| `<FONT_A>`  | Select Font A — default, typically 12×24 dots           |
+| `<FONT_B>`  | Select Font B — smaller, typically 9×17 dots            |
+
+### Text Alignment
+
+| Tag          | Description    |
+| ------------ | -------------- |
+| `<L>...</L>` | Left-aligned   |
+| `<C>...</C>` | Center-aligned |
+| `<R>...</R>` | Right-aligned  |
+
+### Font Size — Presets
+
+These use the **GS !** command for clean size multipliers (1×–8×).
+
+| Tag            | Width | Height | Description        |
+| -------------- | :---: | :----: | ------------------ |
+| `<W2>...</W2>` |  2×   |   1×   | Wide               |
+| `<W3>...</W3>` |  3×   |   1×   | Extra-wide         |
+| `<H2>...</H2>` |  1×   |   2×   | Tall               |
+| `<H3>...</H3>` |  1×   |   3×   | Extra-tall         |
+| `<X2>...</X2>` |  2×   |   2×   | Double size        |
+| `<X3>...</X3>` |  3×   |   3×   | Triple size        |
+| `<X4>...</X4>` |  4×   |   4×   | Quadruple size     |
+
+### Font Size — Custom
+
+Use `<FS:W,H>` for arbitrary width/height multipliers (1–8):
+
+```
+<FS:2,3>Big text</FS>      ← width ×2, height ×3
+<FS:1,5>Very tall</FS>     ← width ×1, height ×5
+<FS:8,8>Maximum size</FS>  ← width ×8, height ×8
+```
+
+### Spacing Control
+
+| Tag                     | Description                                                  |
+| ----------------------- | ------------------------------------------------------------ |
+| `<LINESPC:N>`           | Set line spacing to N dots (0–255). Close with `</LINESPC>`. |
+| `<CHARSPC:N>`           | Set character spacing to N dots (0–255). Close with `</CHARSPC>`. |
+
+### Legacy Size Tags
+
+These use the older **ESC !** command and are kept for backward compatibility.
+
+| Tag            | Description                              |
+| -------------- | ---------------------------------------- |
+| `<B>...</B>`   | Big (double-height + double-width)       |
+| `<D>...</D>`   | Double-width                             |
+| `<DB>...</DB>` | Double-width + bold emphasis             |
+| `<M>...</M>`   | Medium (double-height)                   |
+| `<CM>...</CM>` | Center + medium                          |
+| `<CB>...</CB>` | Center + big                             |
+| `<CD>...</CD>` | Center + double-width                    |
+
+### Actions & Utilities
+
+| Tag          | Description                                       |
+| ------------ | ------------------------------------------------- |
+| `<PARTCUT>`  | Partial paper cut (mid-document)                  |
+| `<DRAWER>`   | Open cash drawer (ESC p pulse)                    |
+| `<TAB>`      | Insert horizontal tab (0x09)                      |
+| `<FEED:N>`   | Feed N blank lines (1–255)                        |
+| `<RESET>`    | Reset all formatting to defaults                  |
+
+### Raw Bytes
+
+For power users who need direct ESC/POS control:
+
+```
+<RAW:1B,40>         ← sends ESC @ (initialize printer)
+<RAW:1D,56,00>      ← sends GS V 0 (full cut, alternative)
+```
+
+### Combining Tags
+
+Tags can be freely combined on the same line:
 
 ```tsx
 await NetPrinter.printBill(
-	"<C><B>MY STORE</B></C>\n" +
-		"================================\n" +
-		"Item 1            $5.00\n" +
-		"Item 2            $3.50\n" +
-		"================================\n" +
-		"<B>TOTAL             $8.50</B>\n",
+  "<C><BOLD><X2>MY STORE</X2></BOLD></C>\n" +
+  "<C><U>================================</U></C>\n" +
+  "<FONT_B>Item 1            $5.00\n" +
+  "Item 2            $3.50\n" +
+  "<FONT_A><BOLD>================================</BOLD>\n" +
+  "<R><FS:2,2>TOTAL  $8.50</FS></R>\n" +
+  "<C><REV> THANK YOU! </REV></C>\n"
 );
 ```
 
