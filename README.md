@@ -562,14 +562,12 @@ The library ships codegen specs in `src/Native*.ts`. The native code is generate
 
 ---
 
-## Author
-
-**Ordovez, Earl Romeo**
-
 ## License
 
-ISC
+MIT
 
-## Funding
+## ❤️ Sponsor
 
-If you find this library useful, consider [sponsoring on GitHub](https://github.com/sponsors/Swif7ify).
+If this project helps you, consider sponsoring its development:
+
+👉 https://github.com/sponsors/Swif7ify
