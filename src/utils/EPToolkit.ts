@@ -291,7 +291,7 @@ const parameterized_tags: Array<{
 type IOptions = {
 	beep: boolean;
 	cut: boolean;
-	tailingLine: boolean;
+	tailingLine: boolean | number;
 	encoding: string;
 };
 
@@ -374,10 +374,12 @@ export function exchange_text(text: string, options: IOptions): Buffer {
 	temp.length && bytes.concat(iconv.encode(temp, m_options.encoding));
 
 	// check for "tailingLine" flag
-	if (
-		typeof m_options["tailingLine"] === "boolean" &&
-		options_controller["tailingLine"]
-	) {
+	if (typeof m_options["tailingLine"] === "number" && m_options["tailingLine"] > 0) {
+		// Feed exact number of lines (1–255) using ESC d n
+		const n = Math.min(Math.max(m_options["tailingLine"], 1), 255);
+		bytes.concat(Buffer.from([27, 100, n]));
+	} else if (m_options["tailingLine"] === true) {
+		// Legacy behaviour: 5 blank lines
 		bytes.concat(options_controller["tailingLine"]);
 	}
 

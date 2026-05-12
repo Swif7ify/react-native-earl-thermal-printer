@@ -163,9 +163,31 @@ Disconnect from the printer.
 interface PrinterOptions {
 	beep?: boolean; // Beep after printing (default: false)
 	cut?: boolean; // Cut paper after printing (default: false)
-	tailingLine?: boolean; // Add trailing blank lines (default: false)
+	tailingLine?: boolean | number; // Trailing blank lines (default: false)
 	encoding?: string; // Text encoding (default: "UTF8")
 }
+```
+
+**`tailingLine` values:**
+
+| Value   | Behavior                                           |
+| ------- | -------------------------------------------------- |
+| `false` | No trailing blank lines (default for `printText`)  |
+| `true`  | 5 trailing blank lines (default for `printBill`)   |
+| number  | Exact number of trailing blank lines (1–255)       |
+
+```tsx
+// No trailing whitespace
+await BLEPrinter.printText("Hello\n", { tailingLine: false });
+
+// Exactly 2 blank lines after printing
+await BLEPrinter.printText("Hello\n", { tailingLine: 2 });
+
+// Default 5 blank lines (same as true)
+await BLEPrinter.printBill("Receipt\n", { tailingLine: true });
+
+// Override printBill default — only 1 trailing line
+await BLEPrinter.printBill("Receipt\n", { tailingLine: 1 });
 ```
 
 ---

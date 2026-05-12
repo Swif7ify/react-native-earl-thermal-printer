@@ -10,7 +10,13 @@ import * as EPToolkit from "./utils/EPToolkit";
 export interface PrinterOptions {
 	beep?: boolean;
 	cut?: boolean;
-	tailingLine?: boolean;
+	/**
+	 * Controls trailing blank lines after printing.
+	 * - `false` — no trailing lines (default for `printText`)
+	 * - `true`  — 5 trailing blank lines (default for `printBill`)
+	 * - number  — exact number of trailing blank lines (1–255)
+	 */
+	tailingLine?: boolean | number;
 	encoding?: string;
 }
 
