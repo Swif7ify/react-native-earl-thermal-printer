@@ -258,6 +258,12 @@ public class USBPrinterAdapter implements PrinterAdapter {
 
     public static Bitmap getBitmapFromURL(String src) {
         try {
+            // Support local file:// URIs (e.g. cached logos for offline printing)
+            if (src.startsWith("file://") || src.startsWith("/")) {
+                String filePath = src.startsWith("file://") ? src.substring(7) : src;
+                Bitmap bmp = BitmapFactory.decodeFile(filePath);
+                return bmp;
+            }
             URL url = new URL(src);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setDoInput(true);

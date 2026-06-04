@@ -145,7 +145,7 @@ Same as `printText` but defaults `beep`, `cut`, and `tailingLine` to `true`.
 
 ### `printImage(imageUrl: string, imageWidth?: number): Promise<void>`
 
-Print an image from a URL. The optional `imageWidth` parameter controls the maximum width in pixels for the printed image (default: `200` on Android, `150` on iOS).
+Print an image from a remote URL (HTTP/HTTPS) or a local file URI (e.g., `file://...` or absolute path on Android). The optional `imageWidth` parameter controls the maximum width in pixels for the printed image (default: `200` on Android, `150` on iOS).
 
 ### `printQrCode(qrCode: string, qrSize?: number): Promise<void>`
 
