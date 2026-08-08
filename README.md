@@ -13,7 +13,7 @@ Supports **USB**, **Bluetooth (BLE)**, and **Network (TCP/IP)** receipt & label 
 
 <!-- 📸 PLACEHOLDER: Main Hero Printed Samples Banner -->
 <div align="center">
-  <img src="./docs/images/hero-printed-samples.png" alt="Thermal Receipts & Labels Overview" width="100%" />
+  <img src="https://raw.githubusercontent.com/Swif7ify/react-native-earl-thermal-printer/main/docs/images/hero-printed-samples.png" alt="Thermal Receipts & Labels Overview" width="100%" />
   <p><em>Real-world thermal receipts, product labels, dispatch tickets, hardware barcodes, and dithered logos printed with react-native-earl-thermal-printer.</em></p>
 </div>
 
@@ -215,19 +215,19 @@ await BLEPrinter.printRawData(payload);
   <tr>
     <td width="33%" align="center">
       <!-- 📸 PLACEHOLDER: Cafe & Restaurant Receipt -->
-      <img src="./docs/images/receipt-cafe-sample.jpg" alt="Cafe & Restaurant Printed Receipt" width="100%" /><br/>
+      <img src="https://raw.githubusercontent.com/Swif7ify/react-native-earl-thermal-printer/main/docs/images/receipt-cafe-sample.jpg" alt="Cafe & Restaurant Printed Receipt" width="100%" /><br/>
       <strong>Cafe & Restaurant Receipt</strong><br/>
       <em>3-Column items, totals, barcode & QR</em>
     </td>
     <td width="33%" align="center">
       <!-- 📸 PLACEHOLDER: Warehouse & Dispatch Label -->
-      <img src="./docs/images/receipt-warehouse-label.jpg" alt="Warehouse Dispatch & Tracking Label" width="100%" /><br/>
+      <img src="https://raw.githubusercontent.com/Swif7ify/react-native-earl-thermal-printer/main/docs/images/receipt-warehouse-label.jpg" alt="Warehouse Dispatch & Tracking Label" width="100%" /><br/>
       <strong>Warehouse Dispatch Label</strong><br/>
       <em>Inverted text, customer info & Code39</em>
     </td>
     <td width="33%" align="center">
       <!-- 📸 PLACEHOLDER: Kitchen Order Ticket (KOT) -->
-      <img src="./docs/images/receipt-kitchen-kot.jpg" alt="Kitchen Order Ticket" width="100%" /><br/>
+      <img src="https://raw.githubusercontent.com/Swif7ify/react-native-earl-thermal-printer/main/docs/images/receipt-kitchen-kot.jpg" alt="Kitchen Order Ticket" width="100%" /><br/>
       <strong>Kitchen Order Ticket (KOT)</strong><br/>
       <em>3× large headers, notes & partial cut</em>
     </td>
@@ -253,7 +253,7 @@ await BLEPrinter.printColumns(
 
 <!-- 📸 PLACEHOLDER: Multi-Column Table Printed Sample -->
 <div align="center">
-  <img src="./docs/images/table-column-sample.jpg" alt="Multi-Column Formatted Table Layout" width="80%" />
+  <img src="https://raw.githubusercontent.com/Swif7ify/react-native-earl-thermal-printer/main/docs/images/table-column-sample.jpg" alt="Multi-Column Formatted Table Layout" width="80%" />
   <p><em>Automatic column wrapping on 58mm thermal paper roll.</em></p>
 </div>
 
@@ -295,7 +295,7 @@ await BLEPrinter.printNativeQRCode("https://example.com/order/1029", {
 
 <!-- 📸 PLACEHOLDER: Hardware Barcodes & QR Code Printed Sample -->
 <div align="center">
-  <img src="./docs/images/barcode-qr-sample.jpg" alt="Native Hardware 1D Barcode & QR Code" width="80%" />
+  <img src="https://raw.githubusercontent.com/Swif7ify/react-native-earl-thermal-printer/main/docs/images/barcode-qr-sample.jpg" alt="Native Hardware 1D Barcode & QR Code" width="80%" />
   <p><em>Direct hardware vector barcodes and ISO/IEC 18004 compliant ESC/POS QR code.</em></p>
 </div>
 
@@ -312,7 +312,7 @@ await BLEPrinter.printImage("https://example.com/logo.png", 300);
 
 <!-- 📸 PLACEHOLDER: Image Dithering Comparison -->
 <div align="center">
-  <img src="./docs/images/dithering-comparison.jpg" alt="Floyd-Steinberg Dithering vs Binary Threshold" width="80%" />
+  <img src="https://raw.githubusercontent.com/Swif7ify/react-native-earl-thermal-printer/main/docs/images/dithering-comparison.jpg" alt="Floyd-Steinberg Dithering vs Binary Threshold" width="80%" />
   <p><em>Left: Standard binary threshold (harsh). Right: Floyd-Steinberg error diffusion (smooth gradients & details).</em></p>
 </div>
 
@@ -447,7 +447,7 @@ When using `printText()` or `printBill()`, tags apply formatting per line:
 
 <!-- 📸 PLACEHOLDER: Text Styles & Sizing Strip -->
 <div align="center">
-  <img src="./docs/images/text-styles-strip.png" alt="ESC/POS Inline Formatting Tags Strip" width="80%" />
+  <img src="https://raw.githubusercontent.com/Swif7ify/react-native-earl-thermal-printer/main/docs/images/text-styles-strip.png" alt="ESC/POS Inline Formatting Tags Strip" width="80%" />
   <p><em>Demonstration strip of inline formatting tags and sizing presets.</em></p>
 </div>
 
