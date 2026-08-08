@@ -112,13 +112,27 @@ public class USBPrinterAdapter implements PrinterAdapter {
     public void init(ReactApplicationContext reactContext, Promise promise) {
         this.mContext = reactContext;
         this.mUSBManager = (UsbManager) this.mContext.getSystemService(Context.USB_SERVICE);
-        this.mPermissionIndent = PendingIntent.getBroadcast(mContext, 0,
-                new Intent(ACTION_USB_PERMISSION), PendingIntent.FLAG_MUTABLE);
+
+        Intent intent = new Intent(ACTION_USB_PERMISSION);
+        intent.setPackage(this.mContext.getPackageName());
+
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            flags |= PendingIntent.FLAG_MUTABLE;
+        }
+
+        this.mPermissionIndent = PendingIntent.getBroadcast(mContext, 0, intent, flags);
         IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
         filter.addAction(UsbManager.ACTION_USB_ACCESSORY_ATTACHED);
         filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
-        mContext.registerReceiver(mUsbDeviceReceiver, filter);
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            mContext.registerReceiver(mUsbDeviceReceiver, filter, Context.RECEIVER_EXPORTED);
+        } else {
+            mContext.registerReceiver(mUsbDeviceReceiver, filter);
+        }
+
         Log.v(LOG_TAG, "RNUSBPrinter initialized");
         promise.resolve("RNUSBPrinter initialized");
     }
@@ -399,16 +413,54 @@ public class USBPrinterAdapter implements PrinterAdapter {
         }
     }
 
+    /**
+     * Enhanced Floyd-Steinberg error diffusion dithering for crystal clear thermal printing.
+     */
     public static int[][] getPixelsSlow(Bitmap image2, int maxSize) {
         Bitmap image = resizeTheImageForPrinting(image2, maxSize);
         int width = image.getWidth();
         int height = image.getHeight();
         int[][] result = new int[height][width];
-        for (int row = 0; row < height; row++) {
-            for (int col = 0; col < width; col++) {
-                result[row][col] = getRGB(image, col, row);
+        int[][] gray = new int[height][width];
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int pixel = image.getPixel(x, y);
+                int a = (pixel >> 24) & 0xff;
+                if (a < 128) {
+                    gray[y][x] = 255;
+                } else {
+                    int r = (pixel >> 16) & 0xff;
+                    int g = (pixel >> 8) & 0xff;
+                    int b = pixel & 0xff;
+                    gray[y][x] = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+                }
             }
         }
+
+        // Floyd-Steinberg Error Diffusion
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int oldVal = gray[y][x];
+                int newVal = oldVal < 128 ? 0 : 255;
+                result[y][x] = (newVal == 0) ? 0xFF000000 : 0xFFFFFFFF;
+                int error = oldVal - newVal;
+
+                if (x + 1 < width) {
+                    gray[y][x + 1] += (error * 7) / 16;
+                }
+                if (y + 1 < height) {
+                    if (x > 0) {
+                        gray[y + 1][x - 1] += (error * 3) / 16;
+                    }
+                    gray[y + 1][x] += (error * 5) / 16;
+                    if (x + 1 < width) {
+                        gray[y + 1][x + 1] += (error * 1) / 16;
+                    }
+                }
+            }
+        }
+
         return result;
     }
 
@@ -431,18 +483,15 @@ public class USBPrinterAdapter implements PrinterAdapter {
     }
 
     private boolean shouldPrintColor(int col) {
-        final int threshold = 127;
-        int a, r, g, b, luminance;
-        a = (col >> 24) & 0xff;
+        int a = (col >> 24) & 0xff;
         if (a != 0xff) {
             return false;
         }
-        r = (col >> 16) & 0xff;
-        g = (col >> 8) & 0xff;
-        b = col & 0xff;
-
-        luminance = (int) (0.299 * r + 0.587 * g + 0.114 * b);
-        return luminance < threshold;
+        int r = (col >> 16) & 0xff;
+        int g = (col >> 8) & 0xff;
+        int b = col & 0xff;
+        int luminance = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+        return luminance < 128;
     }
 
     public static Bitmap resizeTheImageForPrinting(Bitmap image, int maxSize) {

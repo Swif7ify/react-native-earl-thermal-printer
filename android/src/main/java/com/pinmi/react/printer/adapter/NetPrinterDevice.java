@@ -14,6 +14,14 @@ public class NetPrinterDevice implements PrinterDevice {
         this.mNetPrinterDeviceId = NetPrinterDeviceId.valueOf(host, port);
     }
 
+    public String getHost() {
+        return this.mNetPrinterDeviceId != null ? this.mNetPrinterDeviceId.getHost() : "";
+    }
+
+    public int getPort() {
+        return this.mNetPrinterDeviceId != null ? this.mNetPrinterDeviceId.getPort() : 9100;
+    }
+
     @Override
     public PrinterDeviceId getPrinterDeviceId() {
         return this.mNetPrinterDeviceId;

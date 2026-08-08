@@ -4,6 +4,7 @@ import NativeUSBPrinterModule from "./NativeUSBPrinter";
 import NativeBLEPrinterModule from "./NativeBLEPrinter";
 import NativeNetPrinterModule from "./NativeNetPrinter";
 import * as EPToolkit from "./utils/EPToolkit";
+import { ReceiptBuilder } from "./utils/ReceiptBuilder";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -38,9 +39,27 @@ export interface INetPrinter {
 	port: number;
 }
 
+export type {
+	BarcodeType,
+	BarcodeOptions,
+	QRCodeOptions,
+	TableColumn,
+	IOptions,
+} from "./utils/EPToolkit";
+
+export type {
+	Alignment,
+	TextSize,
+	TextOptions,
+	ColumnItem,
+	ReceiptBuilderOptions,
+} from "./utils/ReceiptBuilder";
+
+export { ReceiptBuilder, EPToolkit };
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-const textTo64Buffer = (text: string, opts: PrinterOptions): string => {
+const textTo64Buffer = (text: string, opts: PrinterOptions = {}): string => {
 	const options = {
 		beep: false,
 		cut: false,
@@ -52,7 +71,7 @@ const textTo64Buffer = (text: string, opts: PrinterOptions): string => {
 	return buffer.toString("base64");
 };
 
-const billTo64Buffer = (text: string, opts: PrinterOptions): string => {
+const billTo64Buffer = (text: string, opts: PrinterOptions = {}): string => {
 	const options = {
 		beep: true,
 		cut: true,
@@ -94,6 +113,44 @@ export const USBPrinter = {
 
 	printQrCode: (qrCode: string, qrSize: number = 250): Promise<void> =>
 		NativeUSBPrinterModule.printQrCode(qrCode, qrSize),
+
+	printRawData: (base64Data: string): Promise<void> =>
+		NativeUSBPrinterModule.printRawData(base64Data),
+
+	printColumns: (
+		columns: EPToolkit.TableColumn[],
+		totalWidth: number = 32,
+		opts: PrinterOptions = {},
+	): Promise<void> => {
+		const formatted = EPToolkit.formatColumns(columns, totalWidth);
+		return NativeUSBPrinterModule.printRawData(textTo64Buffer(formatted + "\n", opts));
+	},
+
+	printBarcode: (
+		data: string,
+		barcodeOpts: EPToolkit.BarcodeOptions = {},
+	): Promise<void> => {
+		const buffer = EPToolkit.barcodeBytes(data, barcodeOpts);
+		return NativeUSBPrinterModule.printRawData(buffer.toString("base64"));
+	},
+
+	printNativeQRCode: (
+		data: string,
+		qrOpts: EPToolkit.QRCodeOptions = {},
+	): Promise<void> => {
+		const buffer = EPToolkit.qrCodeBytes(data, qrOpts);
+		return NativeUSBPrinterModule.printRawData(buffer.toString("base64"));
+	},
+
+	openCashDrawer: (pin: 2 | 5 = 2): Promise<void> => {
+		const buffer = EPToolkit.cashDrawerBytes(pin);
+		return NativeUSBPrinterModule.printRawData(buffer.toString("base64"));
+	},
+
+	cutPaper: (partial: boolean = false, feedLines: number = 3): Promise<void> => {
+		const buffer = EPToolkit.cutPaperBytes(partial, feedLines);
+		return NativeUSBPrinterModule.printRawData(buffer.toString("base64"));
+	},
 };
 
 // ── BLE Printer ─────────────────────────────────────────────────────────────
@@ -122,6 +179,44 @@ export const BLEPrinter = {
 
 	printQrCode: (qrCode: string, qrSize: number = 250): Promise<void> =>
 		NativeBLEPrinterModule.printQrCode(qrCode, qrSize),
+
+	printRawData: (base64Data: string): Promise<void> =>
+		NativeBLEPrinterModule.printRawData(base64Data),
+
+	printColumns: (
+		columns: EPToolkit.TableColumn[],
+		totalWidth: number = 32,
+		opts: PrinterOptions = {},
+	): Promise<void> => {
+		const formatted = EPToolkit.formatColumns(columns, totalWidth);
+		return NativeBLEPrinterModule.printRawData(textTo64Buffer(formatted + "\n", opts));
+	},
+
+	printBarcode: (
+		data: string,
+		barcodeOpts: EPToolkit.BarcodeOptions = {},
+	): Promise<void> => {
+		const buffer = EPToolkit.barcodeBytes(data, barcodeOpts);
+		return NativeBLEPrinterModule.printRawData(buffer.toString("base64"));
+	},
+
+	printNativeQRCode: (
+		data: string,
+		qrOpts: EPToolkit.QRCodeOptions = {},
+	): Promise<void> => {
+		const buffer = EPToolkit.qrCodeBytes(data, qrOpts);
+		return NativeBLEPrinterModule.printRawData(buffer.toString("base64"));
+	},
+
+	openCashDrawer: (pin: 2 | 5 = 2): Promise<void> => {
+		const buffer = EPToolkit.cashDrawerBytes(pin);
+		return NativeBLEPrinterModule.printRawData(buffer.toString("base64"));
+	},
+
+	cutPaper: (partial: boolean = false, feedLines: number = 3): Promise<void> => {
+		const buffer = EPToolkit.cutPaperBytes(partial, feedLines);
+		return NativeBLEPrinterModule.printRawData(buffer.toString("base64"));
+	},
 };
 
 // ── Net Printer ─────────────────────────────────────────────────────────────
@@ -151,6 +246,44 @@ export const NetPrinter = {
 
 	printQrCode: (qrCode: string, qrSize: number = 250): Promise<void> =>
 		NativeNetPrinterModule.printQrCode(qrCode, qrSize),
+
+	printRawData: (base64Data: string): Promise<void> =>
+		NativeNetPrinterModule.printRawData(base64Data),
+
+	printColumns: (
+		columns: EPToolkit.TableColumn[],
+		totalWidth: number = 32,
+		opts: PrinterOptions = {},
+	): Promise<void> => {
+		const formatted = EPToolkit.formatColumns(columns, totalWidth);
+		return NativeNetPrinterModule.printRawData(textTo64Buffer(formatted + "\n", opts));
+	},
+
+	printBarcode: (
+		data: string,
+		barcodeOpts: EPToolkit.BarcodeOptions = {},
+	): Promise<void> => {
+		const buffer = EPToolkit.barcodeBytes(data, barcodeOpts);
+		return NativeNetPrinterModule.printRawData(buffer.toString("base64"));
+	},
+
+	printNativeQRCode: (
+		data: string,
+		qrOpts: EPToolkit.QRCodeOptions = {},
+	): Promise<void> => {
+		const buffer = EPToolkit.qrCodeBytes(data, qrOpts);
+		return NativeNetPrinterModule.printRawData(buffer.toString("base64"));
+	},
+
+	openCashDrawer: (pin: 2 | 5 = 2): Promise<void> => {
+		const buffer = EPToolkit.cashDrawerBytes(pin);
+		return NativeNetPrinterModule.printRawData(buffer.toString("base64"));
+	},
+
+	cutPaper: (partial: boolean = false, feedLines: number = 3): Promise<void> => {
+		const buffer = EPToolkit.cutPaperBytes(partial, feedLines);
+		return NativeNetPrinterModule.printRawData(buffer.toString("base64"));
+	},
 };
 
 // ── Events ──────────────────────────────────────────────────────────────────

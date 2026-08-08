@@ -36,6 +36,7 @@ import androidx.annotation.RequiresApi;
 /**
  * Network (TCP/IP) printer adapter implementation.
  * Migrated to Promise-based API for React Native New Architecture (TurboModules).
+ * Enhanced with socket connection timeouts (4s connect, 5s socket timeout) and Floyd-Steinberg dithering.
  *
  * @author Ordovez, Earl Romeo
  */
@@ -79,7 +80,6 @@ public class NetPrinterAdapter implements PrinterAdapter {
     @Override
     public void getDeviceList(Promise promise) {
         // Network printer discovery uses scan(), which emits events asynchronously.
-        // Resolve an empty array immediately; discovered printers arrive via events.
         this.scan();
         WritableArray array = Arguments.createArray();
         promise.resolve(array);
@@ -96,8 +96,11 @@ public class NetPrinterAdapter implements PrinterAdapter {
                     isRunning = true;
                     emitEvent(EVENT_SCANNER_RUNNING, isRunning);
 
+                    if (mContext == null) return;
                     WifiManager wifiManager = (WifiManager) mContext.getApplicationContext()
                             .getSystemService(Context.WIFI_SERVICE);
+                    if (wifiManager == null || wifiManager.getConnectionInfo() == null) return;
+
                     String ipAddress = ipToString(wifiManager.getConnectionInfo().getIpAddress());
                     WritableArray array = Arguments.createArray();
 
@@ -149,32 +152,39 @@ public class NetPrinterAdapter implements PrinterAdapter {
     private static boolean crunchifyAddressReachable(String address, int port) {
         try {
             try (Socket crunchifySocket = new Socket()) {
-                crunchifySocket.connect(new InetSocketAddress(address, port), 100);
+                crunchifySocket.connect(new InetSocketAddress(address, port), 40);
             }
             return true;
         } catch (IOException exception) {
-            exception.printStackTrace();
             return false;
         }
     }
 
     private String ipToString(int ip) {
-        return (ip & 0xFF) + "." + ((ip >> 8) & 0xFF) + "." + ((ip >> 16) & 0xFF) + "." + ((ip >> 24) & 0xFF);
+        return (ip & 0xFF) + "." +
+                ((ip >> 8) & 0xFF) + "." +
+                ((ip >> 16) & 0xFF) + "." +
+                ((ip >> 24) & 0xFF);
     }
 
     @Override
     public void selectDevice(PrinterDeviceId printerDeviceId, Promise promise) {
         NetPrinterDeviceId netPrinterDeviceId = (NetPrinterDeviceId) printerDeviceId;
-
-        if (this.mSocket != null && !this.mSocket.isClosed()
-                && mNetDevice.getPrinterDeviceId().equals(netPrinterDeviceId)) {
-            Log.i(LOG_TAG, "already selected device, do not need repeat to connect");
-            promise.resolve(this.mNetDevice.toRNWritableMap());
-            return;
+        if (this.mSocket != null && !this.mSocket.isClosed() && this.mNetDevice != null) {
+            if (this.mNetDevice.getHost().equals(netPrinterDeviceId.getHost())
+                    && this.mNetDevice.getPort() == netPrinterDeviceId.getPort()) {
+                Log.v(LOG_TAG, "do not need to reconnect");
+                promise.resolve(this.mNetDevice.toRNWritableMap());
+                return;
+            } else {
+                closeConnectionIfExists();
+            }
         }
 
         try {
-            Socket socket = new Socket(netPrinterDeviceId.getHost(), netPrinterDeviceId.getPort());
+            Socket socket = new Socket();
+            socket.connect(new InetSocketAddress(netPrinterDeviceId.getHost(), netPrinterDeviceId.getPort()), 4000);
+            socket.setSoTimeout(5000);
             if (socket.isConnected()) {
                 closeConnectionIfExists();
                 this.mSocket = socket;
@@ -233,11 +243,9 @@ public class NetPrinterAdapter implements PrinterAdapter {
 
     public static Bitmap getBitmapFromURL(String src) {
         try {
-            // Support local file:// URIs (e.g. cached logos for offline printing)
             if (src.startsWith("file://") || src.startsWith("/")) {
                 String filePath = src.startsWith("file://") ? src.substring(7) : src;
-                Bitmap bmp = BitmapFactory.decodeFile(filePath);
-                return bmp;
+                return BitmapFactory.decodeFile(filePath);
             }
             URL url = new URL(src);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -305,7 +313,7 @@ public class NetPrinterAdapter implements PrinterAdapter {
         final Bitmap bitmapImage = TextToQrImageEncode(qrCode, size);
 
         if (bitmapImage == null) {
-            promise.reject("ERR_QR", "QR code generation failed");
+            promise.reject("ERR_QR", "failed to generate qr image");
             return;
         }
 
@@ -364,16 +372,54 @@ public class NetPrinterAdapter implements PrinterAdapter {
         }
     }
 
+    /**
+     * Enhanced Floyd-Steinberg error diffusion dithering for crystal clear thermal printing.
+     */
     public static int[][] getPixelsSlow(Bitmap image2, int maxSize) {
         Bitmap image = resizeTheImageForPrinting(image2, maxSize);
         int width = image.getWidth();
         int height = image.getHeight();
         int[][] result = new int[height][width];
-        for (int row = 0; row < height; row++) {
-            for (int col = 0; col < width; col++) {
-                result[row][col] = getRGB(image, col, row);
+        int[][] gray = new int[height][width];
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int pixel = image.getPixel(x, y);
+                int a = (pixel >> 24) & 0xff;
+                if (a < 128) {
+                    gray[y][x] = 255;
+                } else {
+                    int r = (pixel >> 16) & 0xff;
+                    int g = (pixel >> 8) & 0xff;
+                    int b = pixel & 0xff;
+                    gray[y][x] = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+                }
             }
         }
+
+        // Floyd-Steinberg Error Diffusion
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int oldVal = gray[y][x];
+                int newVal = oldVal < 128 ? 0 : 255;
+                result[y][x] = (newVal == 0) ? 0xFF000000 : 0xFFFFFFFF;
+                int error = oldVal - newVal;
+
+                if (x + 1 < width) {
+                    gray[y][x + 1] += (error * 7) / 16;
+                }
+                if (y + 1 < height) {
+                    if (x > 0) {
+                        gray[y + 1][x - 1] += (error * 3) / 16;
+                    }
+                    gray[y + 1][x] += (error * 5) / 16;
+                    if (x + 1 < width) {
+                        gray[y + 1][x + 1] += (error * 1) / 16;
+                    }
+                }
+            }
+        }
+
         return result;
     }
 
@@ -396,18 +442,15 @@ public class NetPrinterAdapter implements PrinterAdapter {
     }
 
     private boolean shouldPrintColor(int col) {
-        final int threshold = 127;
-        int a, r, g, b, luminance;
-        a = (col >> 24) & 0xff;
+        int a = (col >> 24) & 0xff;
         if (a != 0xff) {
             return false;
         }
-        r = (col >> 16) & 0xff;
-        g = (col >> 8) & 0xff;
-        b = col & 0xff;
-
-        luminance = (int) (0.299 * r + 0.587 * g + 0.114 * b);
-        return luminance < threshold;
+        int r = (col >> 16) & 0xff;
+        int g = (col >> 8) & 0xff;
+        int b = col & 0xff;
+        int luminance = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+        return luminance < 128;
     }
 
     public static Bitmap resizeTheImageForPrinting(Bitmap image, int maxSize) {

@@ -32,6 +32,7 @@ import java.util.UUID;
 /**
  * BLE (Bluetooth) printer adapter implementation.
  * Migrated to Promise-based API for React Native New Architecture (TurboModules).
+ * Enhanced with Android 12+ permission guards, reflection socket fallback, and Floyd-Steinberg dithering.
  *
  * @author Ordovez, Earl Romeo
  */
@@ -67,12 +68,16 @@ public class BLEPrinterAdapter implements PrinterAdapter {
         this.mContext = reactContext;
         BluetoothAdapter bluetoothAdapter = getBTAdapter();
         if (bluetoothAdapter == null) {
-            promise.reject("ERR_BT_ADAPTER", "No bluetooth adapter available");
+            promise.reject("ERR_BT_ADAPTER", "No bluetooth adapter available on this device");
             return;
         }
-        if (!bluetoothAdapter.isEnabled()) {
-            promise.reject("ERR_BT_DISABLED", "Bluetooth adapter is not enabled");
-            return;
+        try {
+            if (!bluetoothAdapter.isEnabled()) {
+                promise.reject("ERR_BT_DISABLED", "Bluetooth is disabled, please turn on Bluetooth");
+                return;
+            }
+        } catch (SecurityException se) {
+            Log.w(LOG_TAG, "BLUETOOTH_CONNECT permission not yet requested during init");
         }
         promise.resolve("RNBLEPrinter initialized");
     }
@@ -88,16 +93,24 @@ public class BLEPrinterAdapter implements PrinterAdapter {
             promise.reject("ERR_BT_ADAPTER", "No bluetooth adapter available");
             return;
         }
-        if (!bluetoothAdapter.isEnabled()) {
-            promise.reject("ERR_BT_DISABLED", "Bluetooth is not enabled");
-            return;
+        try {
+            if (!bluetoothAdapter.isEnabled()) {
+                promise.reject("ERR_BT_DISABLED", "Bluetooth is disabled, please turn on Bluetooth");
+                return;
+            }
+            WritableArray array = Arguments.createArray();
+            Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+            if (pairedDevices != null) {
+                for (BluetoothDevice device : pairedDevices) {
+                    array.pushMap(new BLEPrinterDevice(device).toRNWritableMap());
+                }
+            }
+            promise.resolve(array);
+        } catch (SecurityException se) {
+            promise.reject("ERR_BT_PERMISSION", "Bluetooth permission BLUETOOTH_CONNECT missing on Android 12+ (API 31+): " + se.getMessage());
+        } catch (Exception e) {
+            promise.reject("ERR_BT_DEVICES", e.getMessage());
         }
-        WritableArray array = Arguments.createArray();
-        Set<BluetoothDevice> pairedDevices = getBTAdapter().getBondedDevices();
-        for (BluetoothDevice device : pairedDevices) {
-            array.pushMap(new BLEPrinterDevice(device).toRNWritableMap());
-        }
-        promise.resolve(array);
     }
 
     @Override
@@ -113,39 +126,68 @@ public class BLEPrinterAdapter implements PrinterAdapter {
         }
         BLEPrinterDeviceId blePrinterDeviceId = (BLEPrinterDeviceId) printerDeviceId;
         if (this.mBluetoothDevice != null) {
-            if (this.mBluetoothDevice.getAddress().equals(blePrinterDeviceId.getInnerMacAddress())
-                    && this.mBluetoothSocket != null) {
-                Log.v(LOG_TAG, "do not need to reconnect");
-                promise.resolve(new BLEPrinterDevice(this.mBluetoothDevice).toRNWritableMap());
-                return;
-            } else {
-                closeConnectionIfExists();
-            }
-        }
-        Set<BluetoothDevice> pairedDevices = getBTAdapter().getBondedDevices();
-        for (BluetoothDevice device : pairedDevices) {
-            if (device.getAddress().equals(blePrinterDeviceId.getInnerMacAddress())) {
-                try {
-                    connectBluetoothDevice(device);
+            try {
+                if (this.mBluetoothDevice.getAddress().equals(blePrinterDeviceId.getInnerMacAddress())
+                        && this.mBluetoothSocket != null && this.mBluetoothSocket.isConnected()) {
+                    Log.v(LOG_TAG, "do not need to reconnect");
                     promise.resolve(new BLEPrinterDevice(this.mBluetoothDevice).toRNWritableMap());
                     return;
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    promise.reject("ERR_BT_CONNECT", e.getMessage());
-                    return;
+                } else {
+                    closeConnectionIfExists();
                 }
+            } catch (SecurityException se) {
+                promise.reject("ERR_BT_PERMISSION", se.getMessage());
+                return;
             }
         }
+
+        try {
+            Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+            if (pairedDevices != null) {
+                for (BluetoothDevice device : pairedDevices) {
+                    if (device.getAddress().equals(blePrinterDeviceId.getInnerMacAddress())) {
+                        try {
+                            connectBluetoothDevice(device);
+                            promise.resolve(new BLEPrinterDevice(this.mBluetoothDevice).toRNWritableMap());
+                            return;
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                            promise.reject("ERR_BT_CONNECT", e.getMessage());
+                            return;
+                        }
+                    }
+                }
+            }
+        } catch (SecurityException se) {
+            promise.reject("ERR_BT_PERMISSION", "Bluetooth permission BLUETOOTH_CONNECT missing on Android 12+: " + se.getMessage());
+            return;
+        }
+
         String errorText = "Can not find the specified printing device, please perform Bluetooth pairing in the system settings first.";
-        Toast.makeText(this.mContext, errorText, Toast.LENGTH_LONG).show();
+        if (this.mContext != null) {
+            Toast.makeText(this.mContext, errorText, Toast.LENGTH_LONG).show();
+        }
         promise.reject("ERR_NOT_FOUND", errorText);
     }
 
     private void connectBluetoothDevice(BluetoothDevice device) throws IOException {
         UUID uuid = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb");
-        this.mBluetoothSocket = device.createRfcommSocketToServiceRecord(uuid);
-        this.mBluetoothSocket.connect();
-        this.mBluetoothDevice = device;
+        try {
+            this.mBluetoothSocket = device.createRfcommSocketToServiceRecord(uuid);
+            this.mBluetoothSocket.connect();
+            this.mBluetoothDevice = device;
+        } catch (IOException originalException) {
+            Log.w(LOG_TAG, "Standard RFCOMM connection failed, attempting fallback reflection socket...", originalException);
+            try {
+                java.lang.reflect.Method m = device.getClass().getMethod("createRfcommSocket", new Class[] { int.class });
+                this.mBluetoothSocket = (BluetoothSocket) m.invoke(device, 1);
+                this.mBluetoothSocket.connect();
+                this.mBluetoothDevice = device;
+            } catch (Exception fallbackException) {
+                Log.e(LOG_TAG, "Fallback RFCOMM connection also failed", fallbackException);
+                throw originalException;
+            }
+        }
     }
 
     @Override
@@ -193,11 +235,9 @@ public class BLEPrinterAdapter implements PrinterAdapter {
 
     public static Bitmap getBitmapFromURL(String src) {
         try {
-            // Support local file:// URIs (e.g. cached logos for offline printing)
             if (src.startsWith("file://") || src.startsWith("/")) {
                 String filePath = src.startsWith("file://") ? src.substring(7) : src;
-                Bitmap bmp = BitmapFactory.decodeFile(filePath);
-                return bmp;
+                return BitmapFactory.decodeFile(filePath);
             }
             URL url = new URL(src);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -264,9 +304,10 @@ public class BLEPrinterAdapter implements PrinterAdapter {
         final Bitmap bitmapImage = TextToQrImageEncode(qrCode, size);
 
         if (bitmapImage == null) {
-            promise.reject("ERR_QR", "QR code generation failed");
+            promise.reject("ERR_QR", "failed to generate qr image");
             return;
         }
+
         if (this.mBluetoothSocket == null) {
             promise.reject("ERR_NO_CONN", "Bluetooth connection is not built, may be you forgot to connectPrinter");
             return;
@@ -322,16 +363,54 @@ public class BLEPrinterAdapter implements PrinterAdapter {
         }
     }
 
+    /**
+     * Enhanced Floyd-Steinberg error diffusion dithering for crystal clear thermal printing.
+     */
     public static int[][] getPixelsSlow(Bitmap image2, int maxSize) {
         Bitmap image = resizeTheImageForPrinting(image2, maxSize);
         int width = image.getWidth();
         int height = image.getHeight();
         int[][] result = new int[height][width];
-        for (int row = 0; row < height; row++) {
-            for (int col = 0; col < width; col++) {
-                result[row][col] = getRGB(image, col, row);
+        int[][] gray = new int[height][width];
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int pixel = image.getPixel(x, y);
+                int a = (pixel >> 24) & 0xff;
+                if (a < 128) {
+                    gray[y][x] = 255;
+                } else {
+                    int r = (pixel >> 16) & 0xff;
+                    int g = (pixel >> 8) & 0xff;
+                    int b = pixel & 0xff;
+                    gray[y][x] = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+                }
             }
         }
+
+        // Floyd-Steinberg Error Diffusion
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int oldVal = gray[y][x];
+                int newVal = oldVal < 128 ? 0 : 255;
+                result[y][x] = (newVal == 0) ? 0xFF000000 : 0xFFFFFFFF;
+                int error = oldVal - newVal;
+
+                if (x + 1 < width) {
+                    gray[y][x + 1] += (error * 7) / 16;
+                }
+                if (y + 1 < height) {
+                    if (x > 0) {
+                        gray[y + 1][x - 1] += (error * 3) / 16;
+                    }
+                    gray[y + 1][x] += (error * 5) / 16;
+                    if (x + 1 < width) {
+                        gray[y + 1][x + 1] += (error * 1) / 16;
+                    }
+                }
+            }
+        }
+
         return result;
     }
 
@@ -354,18 +433,15 @@ public class BLEPrinterAdapter implements PrinterAdapter {
     }
 
     private boolean shouldPrintColor(int col) {
-        final int threshold = 127;
-        int a, r, g, b, luminance;
-        a = (col >> 24) & 0xff;
+        int a = (col >> 24) & 0xff;
         if (a != 0xff) {
             return false;
         }
-        r = (col >> 16) & 0xff;
-        g = (col >> 8) & 0xff;
-        b = col & 0xff;
-
-        luminance = (int) (0.299 * r + 0.587 * g + 0.114 * b);
-        return luminance < threshold;
+        int r = (col >> 16) & 0xff;
+        int g = (col >> 8) & 0xff;
+        int b = col & 0xff;
+        int luminance = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+        return luminance < 128;
     }
 
     public static Bitmap resizeTheImageForPrinting(Bitmap image, int maxSize) {

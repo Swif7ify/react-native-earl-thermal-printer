@@ -1,8 +1,8 @@
 import { Buffer } from "buffer";
 import * as iconv from "iconv-lite";
-// import * as Jimp from "jimp";
 
 import BufferHelper from "./buffer-helper";
+import { generateRasterQRCode } from "./qr-encoder";
 
 // ── Printer initialization ──────────────────────────────────────────────────
 
@@ -17,61 +17,36 @@ const c_end_bytes = Buffer.from([]);
 const r_start_bytes = Buffer.from([27, 97, 2]); // ESC a 2 — Right
 const r_end_bytes = Buffer.from([]);
 
-// ── Spacing ─────────────────────────────────────────────────────────────────
-
-const default_space_bytes = Buffer.from([27, 50]); // ESC 2 — Default line spacing
-
-// ── Reset (sent after every newline) ────────────────────────────────────────
+// ── Clean Reset (sent after every newline) ───────────────────────────────────
 
 const reset_bytes = Buffer.from([
-	27,
-	97,
-	0, // ESC a 0  — Left align
-	29,
-	33,
-	0, // GS ! 0   — Normal character size
-	27,
-	33,
-	0, // ESC ! 0  — Normal print mode
-	28,
-	33,
-	0, // FS ! 0   — Normal CJK mode
-	27,
-	45,
-	0, // ESC - 0  — Underline off
-	27,
-	69,
-	0, // ESC E 0  — Bold/emphasis off
-	29,
-	66,
-	0, // GS B 0   — Reverse off
-	27,
-	123,
-	0, // ESC { 0 — Upside-down off
-	27,
-	50, // ESC 2       — Default line spacing
+	27, 97, 0, // ESC a 0  — Left align for next line
+	29, 33, 0, // GS ! 0   — Normal character size (1x1)
+	27, 45, 0, // ESC - 0  — Underline off
+	27, 69, 0, // ESC E 0  — Bold/emphasis off
+	29, 66, 0, // GS B 0   — Reverse off
+	27, 123, 0, // ESC { 0 — Upside-down off
 ]);
 
 // ── Legacy formatting (ESC ! / FS !) ────────────────────────────────────────
-//    These use the master print-mode byte; kept for backward compatibility.
 
-const m_start_bytes = Buffer.from([27, 33, 16, 28, 33, 8]); // Double-height
-const m_end_bytes = Buffer.from([27, 33, 0, 28, 33, 0]);
-const b_start_bytes = Buffer.from([27, 33, 48, 28, 33, 12]); // Double-height + double-width
-const b_end_bytes = Buffer.from([27, 33, 0, 28, 33, 0]);
-const d_start_bytes = Buffer.from([27, 33, 32, 28, 33, 4]); // Double-width
-const d_end_bytes = Buffer.from([27, 33, 0, 28, 33, 0]);
-const db_start_bytes = Buffer.from([27, 33, 40, 28, 33, 12]); // Double-width + bold emphasis
-const db_end_bytes = Buffer.from([27, 33, 0, 28, 33, 0]);
+const m_start_bytes = Buffer.from([27, 33, 16]); // Double-height
+const m_end_bytes = Buffer.from([27, 33, 0]);
+const b_start_bytes = Buffer.from([27, 33, 48]); // Double-height + double-width
+const b_end_bytes = Buffer.from([27, 33, 0]);
+const d_start_bytes = Buffer.from([27, 33, 32]); // Double-width
+const d_end_bytes = Buffer.from([27, 33, 0]);
+const db_start_bytes = Buffer.from([27, 33, 40]); // Double-width + bold emphasis
+const db_end_bytes = Buffer.from([27, 33, 0]);
 
 // ── Legacy alignment + size combos ──────────────────────────────────────────
 
-const cm_start_bytes = Buffer.from([27, 97, 1, 27, 33, 16, 28, 33, 8]);
-const cm_end_bytes = Buffer.from([27, 33, 0, 28, 33, 0]);
-const cb_start_bytes = Buffer.from([27, 97, 1, 27, 33, 48, 28, 33, 12]);
-const cb_end_bytes = Buffer.from([27, 33, 0, 28, 33, 0]);
-const cd_start_bytes = Buffer.from([27, 97, 1, 27, 33, 32, 28, 33, 4]);
-const cd_end_bytes = Buffer.from([27, 33, 0, 28, 33, 0]);
+const cm_start_bytes = Buffer.from([27, 97, 1, 27, 33, 16]);
+const cm_end_bytes = Buffer.from([27, 33, 0]);
+const cb_start_bytes = Buffer.from([27, 97, 1, 27, 33, 48]);
+const cb_end_bytes = Buffer.from([27, 33, 0]);
+const cd_start_bytes = Buffer.from([27, 97, 1, 27, 33, 32]);
+const cd_end_bytes = Buffer.from([27, 33, 0]);
 
 // ── Underline ───────────────────────────────────────────────────────────────
 
@@ -101,8 +76,6 @@ const font_a_bytes = Buffer.from([27, 77, 0]); // ESC M 0 — Font A (default, 1
 const font_b_bytes = Buffer.from([27, 77, 1]); // ESC M 1 — Font B (smaller, 9×17)
 
 // ── Character size helpers (GS ! n) ─────────────────────────────────────────
-//    Width multiplier = bits 0-3 (0–7 → 1×–8×)
-//    Height multiplier = bits 4-7 (0–7 → 1×–8×)
 
 function sizeBytes(w: number, h: number): Buffer {
 	const cw = Math.min(Math.max(w, 1), 8) - 1;
@@ -139,22 +112,38 @@ function charSpacingBytes(n: number): Buffer {
 
 const cut_bytes = Buffer.from([27, 105]); // ESC i — full cut
 const partial_cut_bytes = Buffer.from([27, 109]); // ESC m — partial cut
-const beep_bytes = Buffer.from([27, 66, 3, 2]);
+const beep_bytes = Buffer.from([27, 66, 3, 2]); // ESC B 3 2
 const line_bytes = Buffer.from([10, 10, 10, 10, 10]);
 
 // ── Cash drawer ─────────────────────────────────────────────────────────────
 
-const drawer_bytes = Buffer.from([27, 112, 0, 60, 120]); // ESC p 0 60 120
+const drawer_bytes = Buffer.from([27, 112, 0, 60, 120]); // ESC p 0 60 120 (Pin 2)
+const drawer_pin5_bytes = Buffer.from([27, 112, 1, 60, 120]); // ESC p 1 60 120 (Pin 5)
 
-// ── Encoding ────────────────────────────────────────────────────────────────
+export function cashDrawerBytes(pin: 2 | 5 = 2): Buffer {
+	return pin === 5 ? drawer_pin5_bytes : drawer_bytes;
+}
+
+export function buzzerBytes(times: number = 3, duration: number = 2): Buffer {
+	const n = Math.min(Math.max(times, 1), 9);
+	const t = Math.min(Math.max(duration, 1), 9);
+	return Buffer.from([27, 66, n, t]);
+}
+
+export function cutPaperBytes(
+	partial: boolean = false,
+	feedLines: number = 3,
+): Buffer {
+	const n = Math.min(Math.max(feedLines, 0), 255);
+	const m = partial ? 66 : 65; // GS V m n
+	return Buffer.from([29, 86, m, n]);
+}
 
 const encoding_mappings_bytes: { [key: string]: Buffer } = {
-	// single byte encodings
-	CP437: Buffer.from([27, 116, 0]),
-	// multiple bit encodings
-	GB18030: Buffer.from([28, 38, 28, 67, 0]),
+	CP437: Buffer.from([28, 46, 27, 116, 0]), // FS . (Cancel Chinese) + ESC t 0 (CP437)
+	GB18030: Buffer.from([28, 38]), // FS & (Chinese mode)
 	BIG5: Buffer.from([28, 38, 28, 67, 1]),
-	UTF8: Buffer.from([28, 38, 28, 67, 255]),
+	UTF8: Buffer.from([28, 46]), // FS . (Cancel Chinese/Kanji mode — pure clean text)
 };
 
 const options_controller = {
@@ -165,7 +154,6 @@ const options_controller = {
 };
 
 // ── Static tag → bytes map ──────────────────────────────────────────────────
-//    Tags are matched longest-first at parse time to avoid prefix collisions.
 
 const controller: { [key: string]: Buffer } = {
 	// Legacy formatting
@@ -240,12 +228,194 @@ const controller: { [key: string]: Buffer } = {
 	// Inline action tags (no closing tag)
 	"<PARTCUT>": partial_cut_bytes,
 	"<DRAWER>": drawer_bytes,
+	"<DRAWER2>": drawer_bytes,
+	"<DRAWER5>": drawer_pin5_bytes,
 	"<TAB>": Buffer.from([9]),
 	"<RESET>": reset_bytes,
 };
 
 // Sort tag keys longest-first so that e.g. "</BOLD>" is tried before "</B>"
 const sorted_tags = Object.keys(controller).sort((a, b) => b.length - a.length);
+
+// ── Native Barcode Generation ───────────────────────────────────────────────
+
+export type BarcodeType =
+	| "UPC-A"
+	| "UPC-E"
+	| "EAN13"
+	| "EAN8"
+	| "CODE39"
+	| "ITF"
+	| "CODABAR"
+	| "CODE93"
+	| "CODE128";
+
+export interface BarcodeOptions {
+	type?: BarcodeType;
+	width?: number; // 1–6 (module width multiplier)
+	height?: number; // 1–255 dots (default 80)
+	position?: "none" | "above" | "below" | "both";
+	font?: "A" | "B";
+}
+
+const barcodeTypeMap: Record<BarcodeType, number> = {
+	"UPC-A": 65,
+	"UPC-E": 66,
+	EAN13: 67,
+	EAN8: 68,
+	CODE39: 69,
+	ITF: 70,
+	CODABAR: 71,
+	CODE93: 72,
+	CODE128: 73,
+};
+
+const hriPosMap: Record<string, number> = {
+	none: 0,
+	above: 1,
+	below: 2,
+	both: 3,
+};
+
+export function barcodeBytes(
+	data: string,
+	options: BarcodeOptions = {},
+): Buffer {
+	const type = options.type || "CODE128";
+	let content = data;
+
+	// Auto-adjust module width so wide barcodes fit 58mm & 80mm rolls
+	let width = options.width;
+	if (!width) {
+		width = type === "CODE39" || content.length > 10 ? 1 : 2;
+	}
+	width = Math.min(Math.max(width, 1), 6);
+
+	const height = Math.min(Math.max(options.height || 70, 1), 255);
+	const pos = hriPosMap[options.position || "below"] ?? 2;
+	const font = options.font === "B" ? 1 : 0;
+
+	// Format data for barcode type
+	if (type === "CODE39") {
+		// CODE39 in ESC/POS requires uppercase and start/stop asterisks
+		content = content.toUpperCase().replace(/[^0-9A-Z-. $/+%*]/g, "");
+		if (!content.startsWith("*")) {
+			content = `*${content}*`;
+		}
+	} else if (type === "CODE128" && !content.startsWith("{")) {
+		// ESC/POS CODE128 (m=73) expects code set prefix e.g. {B for standard ASCII
+		content = `{B${content}`;
+	}
+
+	const dataBytes = Buffer.from(content, "ascii");
+	const m = barcodeTypeMap[type] || 73;
+
+	return Buffer.concat([
+		Buffer.from([27, 97, 1]), // Center alignment for barcode
+		Buffer.from([29, 119, width]), // GS w n (width)
+		Buffer.from([29, 104, height]), // GS h n (height)
+		Buffer.from([29, 72, pos]), // GS H n (HRI position)
+		Buffer.from([29, 102, font]), // GS f n (HRI font)
+		Buffer.from([29, 107, m, dataBytes.length]), // GS k m n
+		dataBytes,
+		Buffer.from([27, 97, 0]), // Reset to left alignment
+	]);
+}
+
+// ── Universal ESC/POS QR Code Generation ───────────────────────────────────
+
+export interface QRCodeOptions {
+	size?: number; // 2–12 (module size in dots, default 5)
+	errorCorrection?: "L" | "M" | "Q" | "H";
+}
+
+/**
+ * Generates universal ESC/POS 2D QR code bytes via `GS v 0` raster bitmap.
+ * Supported on 100% of thermal receipt printers without command incompatibilities.
+ */
+export function qrCodeBytes(data: string, options: QRCodeOptions = {}): Buffer {
+	const moduleSize = options.size || 5;
+	const ecc = options.errorCorrection || "M";
+	return generateRasterQRCode(data, moduleSize, ecc);
+}
+
+// ── Multi-Column Table Layout Formatter ─────────────────────────────────────
+
+export interface TableColumn {
+	text: string;
+	width: number; // Fraction (0.0–1.0) or fixed character width
+	align?: "left" | "center" | "right";
+}
+
+export function formatColumns(
+	columns: TableColumn[],
+	totalWidth: number = 32, // 32 for 58mm, 42 or 48 for 80mm
+): string {
+	let remaining = totalWidth;
+	const widths: number[] = [];
+
+	columns.forEach((col, idx) => {
+		if (idx === columns.length - 1) {
+			widths.push(Math.max(remaining, 1));
+		} else if (col.width <= 1.0) {
+			const w = Math.floor(col.width * totalWidth);
+			widths.push(w);
+			remaining -= w;
+		} else {
+			const w = Math.floor(col.width);
+			widths.push(w);
+			remaining -= w;
+		}
+	});
+
+	// Split text into word-wrapped lines per column
+	const colLines: string[][] = columns.map((col, idx) => {
+		const w = widths[idx];
+		const words = (col.text || "").split(" ");
+		const lines: string[] = [];
+		let cur = "";
+
+		for (const word of words) {
+			if (cur.length === 0) {
+				cur = word.slice(0, w);
+			} else if (cur.length + 1 + word.length <= w) {
+				cur += ` ${word}`;
+			} else {
+				lines.push(cur);
+				cur = word.slice(0, w);
+			}
+		}
+		if (cur.length > 0) lines.push(cur);
+		return lines.length > 0 ? lines : [""];
+	});
+
+	const maxLines = Math.max(...colLines.map((l) => l.length));
+	const rows: string[] = [];
+
+	for (let lineIdx = 0; lineIdx < maxLines; lineIdx++) {
+		let rowStr = "";
+		columns.forEach((col, colIdx) => {
+			const w = widths[colIdx];
+			const lineText = colLines[colIdx][lineIdx] || "";
+			const align =
+				col.align || (colIdx === columns.length - 1 ? "right" : "left");
+
+			if (align === "right") {
+				rowStr += lineText.padStart(w, " ");
+			} else if (align === "center") {
+				const padTotal = Math.max(w - lineText.length, 0);
+				const padLeft = Math.floor(padTotal / 2);
+				const padRight = padTotal - padLeft;
+				rowStr += " ".repeat(padLeft) + lineText + " ".repeat(padRight);
+			} else {
+				rowStr += lineText.padEnd(w, " ");
+			}
+		});
+		rows.push(rowStr);
+	}
+
+	return rows.join("\n");
+}
 
 // ── Parameterized tag regexes ───────────────────────────────────────────────
 
@@ -277,6 +447,24 @@ const parameterized_tags: Array<{
 		},
 	},
 	{
+		// <BARCODE:TYPE:DATA> or <BARCODE:DATA> e.g. <BARCODE:CODE128:123456>
+		regex: /^<BARCODE(?::([A-Za-z0-9-]+))?:([^>]+)>/,
+		handler: (m) => {
+			const type = (m[1] || "CODE128") as BarcodeType;
+			const data = m[2] || "";
+			return barcodeBytes(data, { type });
+		},
+	},
+	{
+		// <QR:DATA> or <QR:SIZE:DATA> e.g. <QR:6:https://example.com>
+		regex: /^<QR(?::(\d+))?:([^>]+)>/,
+		handler: (m) => {
+			const size = m[1] ? parseInt(m[1], 10) : 5;
+			const data = m[2] || "";
+			return qrCodeBytes(data, { size });
+		},
+	},
+	{
 		// <RAW:HH,HH,...> — send raw hex bytes
 		regex: /^<RAW:([0-9A-Fa-f,]+)>/,
 		handler: (m) => {
@@ -288,11 +476,11 @@ const parameterized_tags: Array<{
 
 // ── Options ─────────────────────────────────────────────────────────────────
 
-type IOptions = {
-	beep: boolean;
-	cut: boolean;
-	tailingLine: boolean | number;
-	encoding: string;
+export type IOptions = {
+	beep?: boolean;
+	cut?: boolean;
+	tailingLine?: boolean | number;
+	encoding?: string;
 };
 
 const default_options: IOptions = {
@@ -302,33 +490,43 @@ const default_options: IOptions = {
 	encoding: "UTF8",
 };
 
+// ── Text sanitizer for thermal printer single-byte codepages ────────────────
+
+export function sanitizePrinterText(text: string): string {
+	return text
+		.replace(/[•●]/g, "*")
+		.replace(/[’‘]/g, "'")
+		.replace(/[“”]/g, '"')
+		.replace(/[—–]/g, "-")
+		.replace(/…/g, "...");
+}
+
 // ── Main text → buffer converter ────────────────────────────────────────────
 
-export function exchange_text(text: string, options: IOptions): Buffer {
-	const m_options = options || default_options;
+export function exchange_text(text: string, options?: IOptions): Buffer {
+	const m_options = { ...default_options, ...options };
+	const encoding = m_options.encoding || "UTF8";
+
+	// Sanitize common typography that turns into Chinese characters on non-UTF8 printers
+	const sanitized = sanitizePrinterText(text);
 
 	let bytes = new BufferHelper();
 	bytes.concat(init_printer_bytes);
 
 	// set encoding
-	if (
-		m_options["encoding"] &&
-		options_controller["encoding"][m_options["encoding"]]
-	) {
-		bytes.concat(options_controller["encoding"][m_options["encoding"]]);
+	if (encoding && options_controller.encoding[encoding]) {
+		bytes.concat(options_controller.encoding[encoding]);
 	}
 
-	bytes.concat(default_space_bytes);
-
 	let temp = "";
-	for (let i = 0; i < text.length; i++) {
-		let ch = text[i];
+	for (let i = 0; i < sanitized.length; i++) {
+		let ch = sanitized[i];
 		switch (ch) {
 			case "<": {
-				bytes.concat(iconv.encode(temp, m_options.encoding));
+				bytes.concat(iconv.encode(temp, encoding));
 				temp = "";
 
-				const remaining = text.substring(i);
+				const remaining = sanitized.substring(i);
 
 				// 1. Try static tags (longest-first to avoid prefix collisions)
 				let matched = false;
@@ -362,7 +560,7 @@ export function exchange_text(text: string, options: IOptions): Buffer {
 			}
 			case "\n":
 				temp = `${temp}${ch}`;
-				bytes.concat(iconv.encode(temp, m_options.encoding));
+				bytes.concat(iconv.encode(temp, encoding));
 				bytes.concat(reset_bytes);
 				temp = "";
 				break;
@@ -371,26 +569,37 @@ export function exchange_text(text: string, options: IOptions): Buffer {
 				break;
 		}
 	}
-	temp.length && bytes.concat(iconv.encode(temp, m_options.encoding));
+	temp.length && bytes.concat(iconv.encode(temp, encoding));
 
 	// check for "tailingLine" flag
-	if (typeof m_options["tailingLine"] === "number" && m_options["tailingLine"] > 0) {
+	if (
+		typeof m_options.tailingLine === "number" &&
+		m_options.tailingLine > 0
+	) {
 		// Feed exact number of lines (1–255) using ESC d n
-		const n = Math.min(Math.max(m_options["tailingLine"], 1), 255);
+		const n = Math.min(Math.max(m_options.tailingLine, 1), 255);
 		bytes.concat(Buffer.from([27, 100, n]));
-	} else if (m_options["tailingLine"] === true) {
+	} else if (m_options.tailingLine === true) {
 		// Legacy behaviour: 5 blank lines
-		bytes.concat(options_controller["tailingLine"]);
+		bytes.concat(options_controller.tailingLine);
 	}
 
 	// check for "cut" flag
-	if (typeof m_options["cut"] === "boolean" && options_controller["cut"]) {
-		bytes.concat(options_controller["cut"]);
+	if (
+		typeof m_options.cut === "boolean" &&
+		m_options.cut &&
+		options_controller.cut
+	) {
+		bytes.concat(options_controller.cut);
 	}
 
 	// check for "beep" flag
-	if (typeof m_options["beep"] === "boolean" && options_controller["beep"]) {
-		bytes.concat(options_controller["beep"]);
+	if (
+		typeof m_options.beep === "boolean" &&
+		m_options.beep &&
+		options_controller.beep
+	) {
+		bytes.concat(options_controller.beep);
 	}
 
 	return bytes.toBuffer();
@@ -399,47 +608,3 @@ export function exchange_text(text: string, options: IOptions): Buffer {
 // ── Public helpers (re-exported for advanced usage) ─────────────────────────
 
 export { sizeBytes, lineSpacingBytes, charSpacingBytes };
-
-// export async function exchange_image(
-//   imagePath: string,
-//   threshold: number
-// ): Promise<Buffer> {
-//   let bytes = new BufferHelper();
-
-//   try {
-//     // need to find other solution cause jimp is not working in RN
-//     const raw_image = await Jimp.read(imagePath);
-//     const img = raw_image.resize(250, 250).quality(60).greyscale();
-
-//     let hex;
-//     const nl = img.bitmap.width % 256;
-//     const nh = Math.round(img.bitmap.width / 256);
-
-//     // data
-//     const data = Buffer.from([0, 0, 0]);
-//     const line = Buffer.from([10]);
-//     for (let i = 0; i < Math.round(img.bitmap.height / 24) + 1; i++) {
-//       // ESC * m nL nH bitmap
-//       let header = Buffer.from([27, 42, 33, nl, nh]);
-//       bytes.concat(header);
-//       for (let j = 0; j < img.bitmap.width; j++) {
-//         data[0] = data[1] = data[2] = 0; // Clear to Zero.
-//         for (let k = 0; k < 24; k++) {
-//           if (i * 24 + k < img.bitmap.height) {
-//             // if within the BMP size
-//             hex = img.getPixelColor(j, i * 24 + k);
-//             if (Jimp.intToRGBA(hex).r <= threshold) {
-//               data[Math.round(k / 8)] += 128 >> k % 8;
-//             }
-//           }
-//         }
-//         const dit = Buffer.from([data[0], data[1], data[2]]);
-//         bytes.concat(dit);
-//       }
-//       bytes.concat(line);
-//     } // data
-//   } catch (error) {
-//     console.log(error);
-//   }
-//   return bytes.toBuffer();
-// }

@@ -1,0 +1,9 @@
+# docs/images directory
+# - hero-printed-samples.png
+# - receipt-cafe-sample.jpg
+# - receipt-warehouse-label.jpg
+# - receipt-kitchen-kot.jpg
+# - table-column-sample.jpg
+# - barcode-qr-sample.jpg
+# - dithering-comparison.jpg
+# - text-styles-strip.png

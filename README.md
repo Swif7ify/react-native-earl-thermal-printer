@@ -5,9 +5,17 @@
 ![downloads](https://img.shields.io/npm/dm/react-native-earl-thermal-printer)
 ![license](https://img.shields.io/npm/l/react-native-earl-thermal-printer)
 
-A React Native library for USB, Bluetooth (BLE), and Network (TCP/IP) thermal receipt printers. Modern, high-performance thermal printer library for React Native. Built with the New Architecture (TurboModules) for synchronous communication, zero legacy bridge overhead, and Android 12+ Bluetooth compliance.
+A modern, high-performance thermal printer library for React Native. Built with the **New Architecture (TurboModules)** for synchronous communication, zero legacy bridge overhead, Floyd-Steinberg photo dithering, native hardware barcodes, and Android 12+ Bluetooth compliance.
 
-Built for the **React Native New Architecture** (TurboModules / Codegen). Supports Android and iOS.
+Supports **USB**, **Bluetooth (BLE)**, and **Network (TCP/IP)** receipt & label printers across Android and iOS.
+
+---
+
+<!-- 📸 PLACEHOLDER: Main Hero Printed Samples Banner -->
+<div align="center">
+  <img src="./docs/images/hero-printed-samples.png" alt="Thermal Receipts & Labels Overview" width="100%" />
+  <p><em>Real-world thermal receipts, product labels, dispatch tickets, hardware barcodes, and dithered logos printed with react-native-earl-thermal-printer.</em></p>
+</div>
 
 ---
 
@@ -28,28 +36,300 @@ npm install react-native-earl-thermal-printer
 yarn add react-native-earl-thermal-printer
 ```
 
-### iOS
+### iOS Setup
 
 ```bash
 cd ios && pod install
 ```
 
-### Android
+Add Bluetooth and Local Network permission descriptions to your `ios/PodTest/Info.plist` (or your app's `Info.plist`):
 
-No additional steps — the library auto-links via the React Native Gradle plugin.
+```xml
+<key>NSBluetoothAlwaysUsageDescription</key>
+<string>This app requires Bluetooth access to connect to thermal receipt and label printers.</string>
+<key>NSLocalNetworkUsageDescription</key>
+<string>This app requires local network access to discover and connect to network printers.</string>
+```
+
+### Android Setup
+
+Add the required Bluetooth permissions to your `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<!-- Android 12+ (API 31+) -->
+<uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+<!-- Android 11 and below -->
+<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+```
 
 ---
 
 ## Printer Support Matrix
 
-| Feature              | Android |              iOS               |
-| -------------------- | :-----: | :----------------------------: |
-| USB Printer          |   Yes   | No (returns `ERR_UNSUPPORTED`) |
-| BLE Printer          |   Yes   |              Yes               |
-| Net Printer          |   Yes   |              Yes               |
-| Print Text (ESC/POS) |   Yes   |              Yes               |
-| Print Image          |   Yes   |              Yes               |
-| Print QR Code        |   Yes   |              Yes               |
+| Feature | Android | iOS |
+| :--- | :---: | :---: |
+| **USB Printer** | Yes | No (returns `ERR_UNSUPPORTED`) |
+| **BLE Printer** | Yes | Yes |
+| **Net Printer (TCP/IP)** | Yes | Yes |
+| **ReceiptBuilder (Fluent API)** | Yes | Yes |
+| **Thermal Label Printing** | Yes | Yes |
+| **Multi-Column Tables** | Yes | Yes |
+| **Native 1D Barcodes** | Yes | Yes |
+| **Native ESC/POS QR Codes** | Yes | Yes |
+| **Floyd-Steinberg Image Dithering** | Yes | Yes |
+| **Cash Drawer Kick (Pin 2/5)** | Yes | Yes |
+| **Paper Cut / Partial Cut** | Yes | Yes |
+
+---
+
+## 🏷️ Thermal Label & Tag Printing
+
+Print crisp product barcodes, retail shelf price tags, asset labels, and shipping tags using the **`ReceiptBuilder`**:
+
+### 1. Retail Shelf Price Label
+
+```tsx
+const shelfTag = new ReceiptBuilder({ paperWidth: 32 })
+  .align("center")
+  .textLine("ORGANIC WHOLE MILK 1L", { bold: true })
+  .textLine("$3.99", { bold: true, size: "3x" })
+  .textLine("UNIT: $3.99/L | SKU: 88231")
+  .feed(1)
+  .barcode("012345678905", { type: "UPC-A", height: 60, position: "below" })
+  .cut()
+  .build();
+
+await BLEPrinter.printRawData(shelfTag);
+```
+
+### 2. Product Barcode & Asset Tag
+
+```tsx
+const assetTag = new ReceiptBuilder({ paperWidth: 32 })
+  .align("center")
+  .textLine("ACME LOGISTICS CORP", { bold: true })
+  .textLine("ASSET TAG - DO NOT REMOVE", { invert: true })
+  .feed(1)
+  .barcode("AST-992384-US", { type: "CODE128", height: 70, width: 2, position: "below" })
+  .feed(1)
+  .qrCode("https://inventory.acme.com/asset/992384", { size: 6 })
+  .textLine("SN: 992384-2026", { font: "B" })
+  .cut()
+  .build();
+
+await BLEPrinter.printRawData(assetTag);
+```
+
+### 3. Shipping & Package Dispatch Label
+
+```tsx
+const shippingLabel = new ReceiptBuilder({ paperWidth: 48 }) // 80mm / 3-inch roll
+  .align("center")
+  .textLine("EXPRESS COURIER DISPATCH", { bold: true, size: "2x" })
+  .textLine("PRIORITY OVERNIGHT", { invert: true })
+  .divider("=")
+  .keyValue("TRACKING #:", "TRK-9876-2026-US")
+  .keyValue("SERVICE:", "FedEx Express")
+  .keyValue("WEIGHT:", "2.40 kg")
+  .divider("-")
+  .textLine("SHIP TO:", { bold: true })
+  .textLine("Jane Doe - (555) 234-5678")
+  .textLine("742 Evergreen Terrace, Springfield, OR")
+  .divider("-")
+  .barcode("TRK98762026US", { type: "CODE128", height: 80, position: "below" })
+  .feed(1)
+  .qrCode("https://tracking.carrier.com/TRK98762026US", { size: 6 })
+  .cut()
+  .build();
+
+await BLEPrinter.printRawData(shippingLabel);
+```
+
+### 📸 Printed Label Samples & Templates
+
+<table width="100%">
+  <tr>
+    <td width="33%" align="center">
+      <!-- 📸 PLACEHOLDER: Shelf Price Label -->
+      <img src="./docs/images/label-shelf-price.png" alt="Retail Shelf Price Label" width="100%" /><br/>
+      <strong>Retail Shelf Price Tag</strong><br/>
+      <em>Large 3x price, unit info & UPC-A barcode</em>
+    </td>
+    <td width="33%" align="center">
+      <!-- 📸 PLACEHOLDER: Product & Asset Label -->
+      <img src="./docs/images/label-product-barcode.png" alt="Product Barcode & Asset Tag" width="100%" /><br/>
+      <strong>Product Barcode & Asset Tag</strong><br/>
+      <em>Inverted text badge, Code128 & QR code</em>
+    </td>
+    <td width="33%" align="center">
+      <!-- 📸 PLACEHOLDER: Shipping & Dispatch Label -->
+      <img src="./docs/images/label-shipping-dispatch.png" alt="Shipping & Dispatch Box Label" width="100%" /><br/>
+      <strong>Shipping & Dispatch Label</strong><br/>
+      <em>Recipient address, priority badge & tracking barcode</em>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 🚀 Fluent `ReceiptBuilder` API
+
+Instead of manually crafting XML or raw hex tags, use the chainable, type-safe **`ReceiptBuilder`**:
+
+```tsx
+import { ReceiptBuilder, BLEPrinter } from "react-native-earl-thermal-printer";
+
+// Build a complete receipt layout
+const payload = new ReceiptBuilder({ paperWidth: 32 }) // 32 for 58mm, 42/48 for 80mm
+  .align("center")
+  .textLine("COFFEE SHOP", { bold: true, size: "2x" })
+  .textLine("123 Main Street, Suite 100")
+  .textLine("Tel: (555) 123-4567")
+  .divider("-")
+  
+  // Multi-column table layout with auto word-wrap
+  .table([
+    { text: "Item", width: 0.5 },
+    { text: "Qty", width: 0.2, align: "center" },
+    { text: "Price", width: 0.3, align: "right" },
+  ])
+  .divider("-")
+  .table([
+    { text: "Espresso Double", width: 0.5 },
+    { text: "1", width: 0.2, align: "center" },
+    { text: "$3.50", width: 0.3, align: "right" },
+  ])
+  .table([
+    { text: "Oat Milk Croissant", width: 0.5 },
+    { text: "2", width: 0.2, align: "center" },
+    { text: "$8.00", width: 0.3, align: "right" },
+  ])
+  .divider("=")
+  
+  // Totals & Key-Value rows
+  .keyValue("Subtotal:", "$11.50")
+  .keyValue("Tax (8%):", "$0.92")
+  .textLine("TOTAL: $12.42", { bold: true, size: "2x", align: "right" })
+  .feed(1)
+  
+  // Barcode & QR code
+  .barcode("INV-982341", { type: "CODE128", height: 60, position: "below" })
+  .feed(1)
+  .qrCode("https://coffeeshop.com/receipt/982341", { size: 6 })
+  .textLine("Thank you for your visit!", { align: "center" })
+  .cut({ partial: false, feed: 3 })
+  .build();
+
+// Print immediately to any connected printer
+await BLEPrinter.printRawData(payload);
+```
+
+### 📸 Printed Receipt Samples & Templates
+
+<table width="100%">
+  <tr>
+    <td width="33%" align="center">
+      <!-- 📸 PLACEHOLDER: Cafe & Restaurant Receipt -->
+      <img src="./docs/images/receipt-cafe-sample.png" alt="Cafe & Restaurant Printed Receipt" width="100%" /><br/>
+      <strong>Cafe & Restaurant Receipt</strong><br/>
+      <em>3-Column items, totals, barcode & QR</em>
+    </td>
+    <td width="33%" align="center">
+      <!-- 📸 PLACEHOLDER: Warehouse & Dispatch Label -->
+      <img src="./docs/images/receipt-warehouse-label.png" alt="Warehouse Dispatch & Tracking Label" width="100%" /><br/>
+      <strong>Warehouse Dispatch Label</strong><br/>
+      <em>Inverted text, customer info & Code39</em>
+    </td>
+    <td width="33%" align="center">
+      <!-- 📸 PLACEHOLDER: Kitchen Order Ticket (KOT) -->
+      <img src="./docs/images/receipt-kitchen-kot.png" alt="Kitchen Order Ticket" width="100%" /><br/>
+      <strong>Kitchen Order Ticket (KOT)</strong><br/>
+      <em>3× large headers, notes & partial cut</em>
+    </td>
+  </tr>
+</table>
+
+---
+
+## Multi-Column Table Layouts
+
+Automatic word wrapping and proportional columns for itemized bills on 58mm (32 chars) and 80mm (48 chars):
+
+```tsx
+await BLEPrinter.printColumns([
+  { text: "Organic Sourdough Bread", width: 0.5, align: "left" },
+  { text: "x2", width: 0.2, align: "center" },
+  { text: "$12.00", width: 0.3, align: "right" },
+], 32);
+```
+
+<!-- 📸 PLACEHOLDER: Multi-Column Table Printed Sample -->
+<div align="center">
+  <img src="./docs/images/table-column-sample.png" alt="Multi-Column Formatted Table Layout" width="80%" />
+  <p><em>Automatic column wrapping on 58mm thermal paper roll.</em></p>
+</div>
+
+---
+
+## Native Hardware Barcodes & QR Codes
+
+Generate sharp vector barcodes directly from printer hardware without blurry raster images:
+
+```tsx
+// 1D Barcodes: CODE128, CODE39, EAN13, EAN8, UPC-A, UPC-E, ITF, CODABAR
+await BLEPrinter.printBarcode("INV-982341", {
+  type: "CODE128",
+  height: 80,        // Height in dots (1–255)
+  width: 2,          // Width multiplier (1–6)
+  position: "below", // "none" | "above" | "below" | "both"
+});
+
+// 2D Hardware QR Code: Universal ESC/POS GS v 0 Raster Output
+await BLEPrinter.printNativeQRCode("https://example.com/order/1029", {
+  size: 6,              // Module size in dots (3–10)
+  errorCorrection: "M", // "L" (7%), "M" (15%), "Q" (25%), "H" (30%)
+});
+```
+
+### 💡 Barcode Selection Guide & Thermal Paper Limits
+
+| Barcode Type | Recommended For | 58mm Roll (384 dots) | 80mm Roll (576 dots) | Density & Camera Scannability |
+| :--- | :--- | :--- | :--- | :--- |
+| **`CODE128`** *(Recommended)* | Tracking numbers, invoices, orders (`TRK-9988`, `INV-042`) | ✅ **Up to 24 chars** | ✅ **Up to 36 chars** | 🚀 **Highest density.** Thick 2-dot bars scan instantly on all phone cameras. |
+| **`EAN13` / `UPC-A`** | Retail product barcodes (12–13 digits) | ✅ **12–13 digits** | ✅ **12–13 digits** | 🚀 **Standard retail.** Crisp, high-contrast scanning. |
+| **`CODE39`** | Short alphanumeric legacy codes (`BOX-1`, `SKU9`) | ⚠️ **Max 6 chars** | ✅ **Max 10 chars** | ⚠️ **Low density.** Requires 16–19 modules per char. |
+
+> [!WARNING]
+> **CODE39 Hardware Limitation on 58mm Thermal Rolls**:
+> CODE39 is a legacy 1974 standard that requires 9 wide/narrow elements per character plus start/stop asterisks `*`. On standard 58mm thermal rolls (384 printable dots), strings longer than 6–7 characters physically exceed the paper width, causing printer firmware to output a `"wide error!"` warning. If forced to 1-dot width, thermal heat bleeding can make the thin lines too compact for smartphone cameras.
+>
+> **Solution**: Use **`CODE128`** for all alphanumeric codes, serial numbers, and tracking IDs. `CODE128` has double the data density, fits easily on 58mm and 80mm paper rolls, and scans reliably in under 0.05 seconds.
+
+<!-- 📸 PLACEHOLDER: Hardware Barcodes & QR Code Printed Sample -->
+<div align="center">
+  <img src="./docs/images/barcode-qr-sample.png" alt="Native Hardware 1D Barcode & QR Code" width="80%" />
+  <p><em>Direct hardware vector barcodes and ISO/IEC 18004 compliant ESC/POS QR code.</em></p>
+</div>
+
+---
+
+## Floyd-Steinberg Photorealistic Image Dithering
+
+All printer modules feature built-in **Floyd-Steinberg error diffusion dithering**, enabling clean photo, shadow, and logo rendering on black-and-white thermal paper:
+
+```tsx
+// Remote HTTP/HTTPS image or local file URI (file://...)
+await BLEPrinter.printImage("https://example.com/logo.png", 300);
+```
+
+<!-- 📸 PLACEHOLDER: Image Dithering Comparison -->
+<div align="center">
+  <img src="./docs/images/dithering-comparison.png" alt="Floyd-Steinberg Dithering vs Binary Threshold" width="80%" />
+  <p><em>Left: Standard binary threshold (harsh). Right: Floyd-Steinberg error diffusion (smooth gradients & details).</em></p>
+</div>
 
 ---
 
@@ -57,11 +337,11 @@ No additional steps — the library auto-links via the React Native Gradle plugi
 
 ```tsx
 import {
-	USBPrinter,
-	BLEPrinter,
-	NetPrinter,
-	NetPrinterEventEmitter,
-	RN_THERMAL_RECEIPT_PRINTER_EVENTS,
+  USBPrinter,
+  BLEPrinter,
+  NetPrinter,
+  NetPrinterEventEmitter,
+  RN_THERMAL_RECEIPT_PRINTER_EVENTS,
 } from "react-native-earl-thermal-printer";
 ```
 
@@ -71,10 +351,11 @@ import {
 await USBPrinter.init();
 const devices = await USBPrinter.getDeviceList();
 await USBPrinter.connectPrinter(devices[0].vendor_id, devices[0].product_id);
-await USBPrinter.printText("Hello from USB!\n");
-await USBPrinter.printBill("Receipt line\n");
+
+await USBPrinter.printText("<C><B>Hello from USB!</B></C>\n");
+await USBPrinter.printBarcode("1234567890", { type: "CODE128" });
 await USBPrinter.printImage("https://example.com/logo.png", 300);
-await USBPrinter.printQrCode("https://example.com", 200);
+await USBPrinter.cutPaper();
 USBPrinter.closeConn();
 ```
 
@@ -84,30 +365,27 @@ USBPrinter.closeConn();
 await BLEPrinter.init();
 const devices = await BLEPrinter.getDeviceList();
 await BLEPrinter.connectPrinter(devices[0].inner_mac_address);
-await BLEPrinter.printText("Hello from BLE!\n");
+
+await BLEPrinter.printText("<C><B>Hello from BLE!</B></C>\n");
 await BLEPrinter.printBill("Receipt line\n");
-await BLEPrinter.printImage("https://example.com/logo.png", 300);
-await BLEPrinter.printQrCode("https://example.com", 200);
+await BLEPrinter.openCashDrawer(2); // Kick cash drawer pin 2
 BLEPrinter.closeConn();
 ```
 
-### Net Printer
+### Net Printer (TCP/IP)
 
 ```tsx
 await NetPrinter.init();
 
-// Listen for discovered printers on the local subnet
+// Listen for network printers discovered via UDP broadcast
 NetPrinterEventEmitter.addListener(
-	RN_THERMAL_RECEIPT_PRINTER_EVENTS.EVENT_NET_PRINTER_SCANNED_SUCCESS,
-	(printers) => console.log("Found:", printers),
+  RN_THERMAL_RECEIPT_PRINTER_EVENTS.EVENT_NET_PRINTER_SCANNED_SUCCESS,
+  (printers) => console.log("Found printers:", printers)
 );
 
 const devices = await NetPrinter.getDeviceList();
 await NetPrinter.connectPrinter("192.168.1.100", 9100);
-await NetPrinter.printText("Hello from Network!\n");
-await NetPrinter.printBill("Receipt line\n");
-await NetPrinter.printImage("https://example.com/logo.png", 300);
-await NetPrinter.printQrCode("https://example.com", 200);
+await NetPrinter.printText("Hello from Network Printer!\n");
 NetPrinter.closeConn();
 ```
 
@@ -115,481 +393,79 @@ NetPrinter.closeConn();
 
 ## API Reference
 
-All three printer objects (`USBPrinter`, `BLEPrinter`, `NetPrinter`) share the same high-level interface:
+All three printer objects (`USBPrinter`, `BLEPrinter`, `NetPrinter`) provide the following methods:
 
-### `init(): Promise<string>`
+### Connection Management
+* `init(): Promise<string>` — Initialize native module.
+* `getDeviceList(): Promise<Device[]>` — Discover paired or connected printers.
+* `connectPrinter(...): Promise<Device>` — Connect to device.
+* `closeConn(): void` — Safely close connection.
 
-Initialize the printer module. **Must be called before any other method.**
-
-### `getDeviceList(): Promise<IUSBPrinter[] | IBLEPrinter[] | INetPrinter[]>`
-
-Scan for available printers and return a list of discovered devices.
-
-### `connectPrinter(...): Promise<object>`
-
-Connect to a printer.
-
-| Printer | Parameters                            |
-| ------- | ------------------------------------- |
-| USB     | `vendorId: number, productId: number` |
-| BLE     | `innerMacAddress: string`             |
-| Net     | `host: string, port: number`          |
-
-### `printText(text: string, opts?: PrinterOptions): Promise<void>`
-
-Print a text string using ESC/POS encoding. Supports formatting tags (see below).
-
-### `printBill(text: string, opts?: PrinterOptions): Promise<void>`
-
-Same as `printText` but defaults `beep`, `cut`, and `tailingLine` to `true`.
-
-### `printImage(imageUrl: string, imageWidth?: number): Promise<void>`
-
-Print an image from a remote URL (HTTP/HTTPS) or a local file URI (e.g., `file://...` or absolute path on Android). The optional `imageWidth` parameter controls the maximum width in pixels for the printed image (default: `200` on Android, `150` on iOS).
-
-### `printQrCode(qrCode: string, qrSize?: number): Promise<void>`
-
-Print a QR code. The optional `qrSize` parameter controls the size in pixels of the generated QR code (default: `250`).
-
-### `closeConn(): void`
-
-Disconnect from the printer.
+### Printing Methods
+* `printText(text: string, opts?: PrinterOptions): Promise<void>` — Print formatted ESC/POS string.
+* `printBill(text: string, opts?: PrinterOptions): Promise<void>` — Print with automatic trailing blank lines and paper cut.
+* `printImage(imageUrl: string, imageWidth?: number): Promise<void>` — Print image with Floyd-Steinberg dithering from remote URL or `file://`.
+* `printQrCode(qrCode: string, qrSize?: number): Promise<void>` — Print 2D QR code.
+* `printBarcode(data: string, opts?: BarcodeOptions): Promise<void>` — Print native hardware 1D barcode.
+* `printNativeQRCode(data: string, opts?: QRCodeOptions): Promise<void>` — Direct ESC/POS hardware QR code.
+* `printColumns(columns: TableColumn[], totalWidth?: number): Promise<void>` — Multi-column formatted table with wrapping.
+* `openCashDrawer(pin?: 2 | 5): Promise<void>` — Pulse cash drawer kickout (pin 2 or pin 5).
+* `cutPaper(partial?: boolean, feedLines?: number): Promise<void>` — Cut receipt paper.
+* `printRawData(base64Data: string): Promise<void>` — Send raw base64-encoded ESC/POS bytes.
 
 ---
 
-## PrinterOptions
+## Barcode Support
 
-```ts
-interface PrinterOptions {
-	beep?: boolean; // Beep after printing (default: false)
-	cut?: boolean; // Cut paper after printing (default: false)
-	tailingLine?: boolean | number; // Trailing blank lines (default: false)
-	encoding?: string; // Text encoding (default: "UTF8")
-}
-```
-
-**`tailingLine` values:**
-
-| Value   | Behavior                                           |
-| ------- | -------------------------------------------------- |
-| `false` | No trailing blank lines (default for `printText`)  |
-| `true`  | 5 trailing blank lines (default for `printBill`)   |
-| number  | Exact number of trailing blank lines (1–255)       |
+Generate crisp hardware barcodes without relying on slow image rasterization:
 
 ```tsx
-// No trailing whitespace
-await BLEPrinter.printText("Hello\n", { tailingLine: false });
-
-// Exactly 2 blank lines after printing
-await BLEPrinter.printText("Hello\n", { tailingLine: 2 });
-
-// Default 5 blank lines (same as true)
-await BLEPrinter.printBill("Receipt\n", { tailingLine: true });
-
-// Override printBill default — only 1 trailing line
-await BLEPrinter.printBill("Receipt\n", { tailingLine: 1 });
-```
-
----
-
-## ESC/POS Formatting Tags
-
-The text helpers (`printText`, `printBill`) support inline formatting tags.
-All formatting **resets automatically on every `\n`** (newline), so tags apply per-line.
-
-### Text Style
-
-| Tag                    | Description                                          |
-| ---------------------- | ---------------------------------------------------- |
-| `<BOLD>...</BOLD>`     | Bold / emphasis (no size change)                     |
-| `<U>...</U>`           | Underline (1-dot thin)                               |
-| `<U2>...</U2>`         | Underline (2-dot thick)                              |
-| `<REV>...</REV>`       | Reverse (white text on black background)             |
-| `<UPDOWN>...</UPDOWN>` | Upside-down printing                                 |
-
-### Font Selection
-
-| Tag         | Description                                             |
-| ----------- | ------------------------------------------------------- |
-| `<FONT_A>`  | Select Font A — default, typically 12×24 dots           |
-| `<FONT_B>`  | Select Font B — smaller, typically 9×17 dots            |
-
-### Text Alignment
-
-| Tag          | Description    |
-| ------------ | -------------- |
-| `<L>...</L>` | Left-aligned   |
-| `<C>...</C>` | Center-aligned |
-| `<R>...</R>` | Right-aligned  |
-
-### Font Size — Presets
-
-These use the **GS !** command for clean size multipliers (1×–8×).
-
-| Tag            | Width | Height | Description        |
-| -------------- | :---: | :----: | ------------------ |
-| `<W2>...</W2>` |  2×   |   1×   | Wide               |
-| `<W3>...</W3>` |  3×   |   1×   | Extra-wide         |
-| `<H2>...</H2>` |  1×   |   2×   | Tall               |
-| `<H3>...</H3>` |  1×   |   3×   | Extra-tall         |
-| `<X2>...</X2>` |  2×   |   2×   | Double size        |
-| `<X3>...</X3>` |  3×   |   3×   | Triple size        |
-| `<X4>...</X4>` |  4×   |   4×   | Quadruple size     |
-
-### Font Size — Custom
-
-Use `<FS:W,H>` for arbitrary width/height multipliers (1–8):
-
-```
-<FS:2,3>Big text</FS>      ← width ×2, height ×3
-<FS:1,5>Very tall</FS>     ← width ×1, height ×5
-<FS:8,8>Maximum size</FS>  ← width ×8, height ×8
-```
-
-### Spacing Control
-
-| Tag                     | Description                                                  |
-| ----------------------- | ------------------------------------------------------------ |
-| `<LINESPC:N>`           | Set line spacing to N dots (0–255). Close with `</LINESPC>`. |
-| `<CHARSPC:N>`           | Set character spacing to N dots (0–255). Close with `</CHARSPC>`. |
-
-### Legacy Size Tags
-
-These use the older **ESC !** command and are kept for backward compatibility.
-
-| Tag            | Description                              |
-| -------------- | ---------------------------------------- |
-| `<B>...</B>`   | Big (double-height + double-width)       |
-| `<D>...</D>`   | Double-width                             |
-| `<DB>...</DB>` | Double-width + bold emphasis             |
-| `<M>...</M>`   | Medium (double-height)                   |
-| `<CM>...</CM>` | Center + medium                          |
-| `<CB>...</CB>` | Center + big                             |
-| `<CD>...</CD>` | Center + double-width                    |
-
-### Actions & Utilities
-
-| Tag          | Description                                       |
-| ------------ | ------------------------------------------------- |
-| `<PARTCUT>`  | Partial paper cut (mid-document)                  |
-| `<DRAWER>`   | Open cash drawer (ESC p pulse)                    |
-| `<TAB>`      | Insert horizontal tab (0x09)                      |
-| `<FEED:N>`   | Feed N blank lines (1–255)                        |
-| `<RESET>`    | Reset all formatting to defaults                  |
-
-### Raw Bytes
-
-For power users who need direct ESC/POS control:
-
-```
-<RAW:1B,40>         ← sends ESC @ (initialize printer)
-<RAW:1D,56,00>      ← sends GS V 0 (full cut, alternative)
-```
-
-### Combining Tags
-
-Tags can be freely combined on the same line:
-
-```tsx
-await NetPrinter.printBill(
-  "<C><BOLD><X2>MY STORE</X2></BOLD></C>\n" +
-  "<C><U>================================</U></C>\n" +
-  "<FONT_B>Item 1            $5.00\n" +
-  "Item 2            $3.50\n" +
-  "<FONT_A><BOLD>================================</BOLD>\n" +
-  "<R><FS:2,2>TOTAL  $8.50</FS></R>\n" +
-  "<C><REV> THANK YOU! </REV></C>\n"
-);
-```
-
----
-
-## Interfaces
-
-```ts
-interface IUSBPrinter {
-	device_name: string;
-	device_id: number;
-	vendor_id: number;
-	product_id: number;
-}
-
-interface IBLEPrinter {
-	device_name: string;
-	inner_mac_address: string;
-}
-
-interface INetPrinter {
-	device_name: string;
-	host: string;
-	port: number;
-}
-```
-
----
-
-## Events
-
-Net printer scanning emits events via `NetPrinterEventEmitter`:
-
-| Event             | Enum                                | Payload         |
-| ----------------- | ----------------------------------- | --------------- |
-| `scannerResolved` | `EVENT_NET_PRINTER_SCANNED_SUCCESS` | `INetPrinter[]` |
-| `scannerRunning`  | `EVENT_NET_PRINTER_SCANNING`        | `boolean`       |
-
-```tsx
-import {
-	NetPrinterEventEmitter,
-	RN_THERMAL_RECEIPT_PRINTER_EVENTS,
-} from "react-native-earl-thermal-printer";
-
-NetPrinterEventEmitter.addListener(
-	RN_THERMAL_RECEIPT_PRINTER_EVENTS.EVENT_NET_PRINTER_SCANNED_SUCCESS,
-	(printers) => {
-		console.log("Discovered printers:", printers);
-	},
-);
-
-NetPrinterEventEmitter.addListener(
-	RN_THERMAL_RECEIPT_PRINTER_EVENTS.EVENT_NET_PRINTER_SCANNING,
-	(isScanning) => {
-		console.log("Scanning:", isScanning);
-	},
-);
-```
-
----
-
-## Android Permissions
-
-Add these permissions to your `AndroidManifest.xml`:
-
-```xml
-<!-- USB -->
-<uses-feature android:name="android.hardware.usb.host" android:required="false" />
-
-<!-- Bluetooth -->
-<uses-permission android:name="android.permission.BLUETOOTH" />
-<uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-<uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-
-<!-- Network -->
-<uses-permission android:name="android.permission.INTERNET" />
-```
-
----
-
-## Example
-
-```tsx
-import React, { useEffect, useState } from "react";
-import {
-	Alert,
-	Button,
-	FlatList,
-	PermissionsAndroid,
-	Platform,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
-} from "react-native";
-import { BLEPrinter, IBLEPrinter } from "react-native-earl-thermal-printer";
-
-export default function ThermalPrinterTest() {
-	const [printers, setPrinters] = useState<IBLEPrinter[]>([]);
-	const [currentPrinter, setCurrentPrinter] = useState<IBLEPrinter | null>(
-		null,
-	);
-
-	useEffect(() => {
-		BLEPrinter.init()
-			.then(() => {
-				console.log("Printer initialized");
-			})
-			.catch((err) => {
-				console.warn("Init failed:", err);
-			});
-	}, []);
-
-	const requestPermissions = async () => {
-		if (Platform.OS === "android") {
-			try {
-				const granted = await PermissionsAndroid.requestMultiple([
-					PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-					PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-					PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-				]);
-				if (
-					granted["android.permission.BLUETOOTH_CONNECT"] ===
-					PermissionsAndroid.RESULTS.GRANTED
-				) {
-					scanDevices();
-				} else {
-					Alert.alert("Permission denied");
-				}
-			} catch (err) {
-				console.warn(err);
-			}
-		} else {
-			scanDevices();
-		}
-	};
-
-	const scanDevices = () => {
-		BLEPrinter.getDeviceList()
-			.then(setPrinters)
-			.catch((err) => Alert.alert("Scan Failed", String(err)));
-	};
-
-	const connectPrinter = (printer: IBLEPrinter) => {
-		BLEPrinter.connectPrinter(printer.inner_mac_address)
-			.then((connected) => {
-				setCurrentPrinter(connected);
-				Alert.alert(
-					"Connected",
-					`Connected to ${connected.device_name}`,
-				);
-			})
-			.catch((err) => Alert.alert("Connection Failed", String(err)));
-	};
-
-	const printTicket = async () => {
-		if (!currentPrinter) {
-			Alert.alert("No Printer", "Please connect to a printer first.");
-			return;
-		}
-
-		try {
-			// To print a QR code:
-			await BLEPrinter.printQrCode("ZAM-OC-0001", 100); // qrSize
-			// Print formatted receipt text (beeps + cuts automatically)
-			const bill =
-				"--------------------------------\n" +
-				"Item 1               $10.00\n" +
-				"Item 2               $20.00\n" +
-				"--------------------------------\n" +
-				"<B>TOTAL              $30.00</B>\n\n\n";
-
-			await BLEPrinter.printBill(bill);
-
-			// To print an image from URL:
-			// await BLEPrinter.printImage(
-				"https://images.unsplash.com/photo-1771258052747-52e19364185f?q=80&w=765&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-				300, // imageWidth
-			);
-		} catch (err) {
-			console.warn("Print error:", err);
-			Alert.alert("Print Error", String(err));
-		}
-	};
-
-	return (
-		<View style={styles.container}>
-			<Button title="Scan for Printers" onPress={requestPermissions} />
-
-			<FlatList
-				data={printers}
-				keyExtractor={(item) => item.inner_mac_address}
-				renderItem={({ item }) => (
-					<TouchableOpacity
-						style={styles.deviceItem}
-						onPress={() => connectPrinter(item)}
-					>
-						<Text>{item.device_name || "Unknown Device"}</Text>
-						<Text style={styles.subText}>
-							{item.inner_mac_address}
-						</Text>
-					</TouchableOpacity>
-				)}
-				style={{ maxHeight: 200, marginVertical: 20 }}
-			/>
-
-			<View style={styles.printArea}>
-				<Text style={{ marginBottom: 10 }}>
-					Status:{" "}
-					{currentPrinter
-						? `Connected to ${currentPrinter.device_name}`
-						: "Disconnected"}
-				</Text>
-				<Button
-					title="Print Test Receipt"
-					onPress={printTicket}
-					disabled={!currentPrinter}
-				/>
-			</View>
-		</View>
-	);
-}
-
-const styles = StyleSheet.create({
-	container: { flex: 1, padding: 40, paddingTop: 60 },
-	deviceItem: { padding: 10, borderBottomWidth: 1, borderColor: "#ccc" },
-	subText: { fontSize: 10, color: "#666" },
-	printArea: { marginTop: 20, alignItems: "center" },
+await BLEPrinter.printBarcode("978020137962", {
+  type: "EAN13", // "CODE128" | "CODE39" | "EAN13" | "EAN8" | "UPC-A" | "ITF" | "CODABAR"
+  height: 80,    // Height in dots (1–255)
+  width: 2,      // Width multiplier (1–6)
+  position: "below", // "none" | "above" | "below" | "both"
 });
 ```
 
 ---
 
-## Running the Example
+## ESC/POS Inline Formatting Tags
 
-A working example app lives in the `example/` directory.
+When using `printText()` or `printBill()`, tags apply formatting per line:
 
-### Prerequisites
+| Tag | Closing Tag | Description |
+| :--- | :--- | :--- |
+| `<C>` | `</C>` | Center alignment |
+| `<R>` | `</R>` | Right alignment |
+| `<L>` | `</L>` | Left alignment |
+| `<BOLD>` | `</BOLD>` | Bold emphasis |
+| `<U>` | `</U>` | 1-dot underline |
+| `<U2>` | `</U2>` | 2-dot thick underline |
+| `<REV>` | `</REV>` | Reverse white-on-black text |
+| `<UPDOWN>` | `</UPDOWN>` | Upside-down text |
+| `<FONT_A>` | — | Standard font (12×24) |
+| `<FONT_B>` | — | Compact font (9×17) |
+| `<W2>` | `</W2>` | 2× width |
+| `<H2>` | `</H2>` | 2× height |
+| `<X2>` | `</X2>` | 2× width & 2× height |
+| `<FS:W,H>` | `</FS>` | Custom font size (e.g. `<FS:3,3>`) |
+| `<LINESPC:N>` | `</LINESPC>` | Line spacing in dots (0–255) |
+| `<CHARSPC:N>` | `</CHARSPC>` | Character spacing in dots (0–255) |
+| `<FEED:N>` | — | Feed N blank lines |
+| `<BARCODE:TYPE:DATA>` | — | Embed inline barcode (e.g. `<BARCODE:CODE128:ABC123>`) |
+| `<QR:SIZE:DATA>` | — | Embed inline QR code (e.g. `<QR:6:https://example.com>`) |
+| `<PARTCUT>` | — | Partial paper cut |
+| `<DRAWER>` | — | Pulse cash drawer |
 
-- [Node.js](https://nodejs.org/) (>= 18)
-- [Yarn](https://classic.yarnpkg.com/) (v1) — required because the example uses `link:..`
-- Android Studio with an emulator or a physical device (USB debugging enabled)
-- For iOS: Xcode with CocoaPods
-
-### Setup & Run
-
-```bash
-# 1. Install root dependencies
-yarn install
-
-# 2. Install example dependencies
-cd example
-yarn install
-
-# 3. Run on Android
-yarn android
-
-# 4. (iOS) Install pods, then run
-cd ios && pod install && cd ..
-yarn ios
-```
-
-> **Windows users:** If the build fails with a `mkdir` / path error, the project path is too long for CMake. Use `subst` to shorten it:
->
-> ```powershell
-> subst P: "C:\path\to\react-native-thermal-receipt-printer"
-> cd P:\example\android
-> .\gradlew.bat app:assembleDebug
-> ```
-
----
-
-## New Architecture
-
-This library is built for the React Native **New Architecture** using TurboModules and Codegen. It requires:
-
-- React Native **>= 0.73**
-- New Architecture **enabled** in your app
-
-The library ships codegen specs in `src/Native*.ts`. The native code is generated automatically during the build.
+<!-- 📸 PLACEHOLDER: Text Styles & Sizing Strip -->
+<div align="center">
+  <img src="./docs/images/text-styles-strip.png" alt="ESC/POS Inline Formatting Tags Strip" width="80%" />
+  <p><em>Demonstration strip of inline formatting tags and sizing presets.</em></p>
+</div>
 
 ---
 
 ## License
 
-MIT
-
-## ❤️ Sponsor
-
-If this project helps you, consider sponsoring its development:
-
-👉 https://github.com/sponsors/Swif7ify
+ISC © [Ordovez, Earl Romeo](https://github.com/Swif7ify)
