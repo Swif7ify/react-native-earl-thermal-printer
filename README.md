@@ -36,33 +36,121 @@ npm install react-native-earl-thermal-printer
 yarn add react-native-earl-thermal-printer
 ```
 
-### iOS Setup
+---
 
-```bash
-cd ios && pod install
+## ⚙️ Platform Setup
+
+Choose your development workflow below:
+
+### Option A: Expo (Managed Workflow & EAS Build)
+
+Since this library uses native TurboModules and low-level hardware drivers (Bluetooth BLE, USB OTG, TCP/IP sockets), it requires a **Development Build** (`npx expo run:android` / `npx expo run:ios` or [EAS Build](https://docs.expo.dev/build/introduction/)). *Standard Expo Go is not supported for custom native hardware drivers.*
+
+Add the permissions and usage descriptions to your **`app.json`** (or `app.config.js`):
+
+```json
+{
+  "expo": {
+    "name": "Your App Name",
+    "slug": "your-app-slug",
+    "ios": {
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "This app requires Bluetooth access to connect to thermal receipt and label printers.",
+        "NSBluetoothPeripheralUsageDescription": "This app requires Bluetooth access to connect to thermal receipt and label printers.",
+        "NSLocalNetworkUsageDescription": "This app requires local network access to discover and connect to network printers."
+      }
+    },
+    "android": {
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CHANGE_WIFI_MULTICAST_STATE"
+      ]
+    }
+  }
+}
 ```
 
-Add Bluetooth and Local Network permission descriptions to your `ios/PodTest/Info.plist` (or your app's `Info.plist`):
+> [!NOTE]
+> During EAS Build or `npx expo prebuild`, Expo reads your `app.json` and automatically injects these keys into the generated `AndroidManifest.xml` and `Info.plist` native files.
+
+---
+
+### Option B: Bare React Native (React Native CLI)
+
+#### iOS Setup
+
+1. Install CocoaPods dependencies:
+   ```bash
+   cd ios && pod install
+   ```
+
+2. Add Bluetooth and Local Network permission descriptions to your `ios/<YourAppName>/Info.plist`:
+   ```xml
+   <key>NSBluetoothAlwaysUsageDescription</key>
+   <string>This app requires Bluetooth access to connect to thermal receipt and label printers.</string>
+   <key>NSBluetoothPeripheralUsageDescription</key>
+   <string>This app requires Bluetooth access to connect to thermal receipt and label printers.</string>
+   <key>NSLocalNetworkUsageDescription</key>
+   <string>This app requires local network access to discover and connect to network printers.</string>
+   ```
+
+#### Android Setup
+
+Add the required permissions to `android/app/src/main/AndroidManifest.xml`:
 
 ```xml
-<key>NSBluetoothAlwaysUsageDescription</key>
-<string>This app requires Bluetooth access to connect to thermal receipt and label printers.</string>
-<key>NSLocalNetworkUsageDescription</key>
-<string>This app requires local network access to discover and connect to network printers.</string>
-```
+<!-- Network Printer (TCP/IP & UDP Discovery) -->
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
-### Android Setup
-
-Add the required Bluetooth permissions to your `android/app/src/main/AndroidManifest.xml`:
-
-```xml
-<!-- Android 12+ (API 31+) -->
+<!-- Android 12+ (API 31+) Bluetooth Permissions -->
 <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
 <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
-<!-- Android 11 and below -->
+<!-- Android 11 and below Bluetooth Permissions -->
 <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
 <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+<!-- USB Printer Support -->
+<uses-feature android:name="android.hardware.usb.host" android:required="false" />
+<uses-permission android:name="android.hardware.usb.UsbAccessory" />
+```
+
+#### Android 12+ Runtime Permission Request (JavaScript)
+
+On Android 12+ (API level 31+), `BLUETOOTH_CONNECT` and `BLUETOOTH_SCAN` must be requested at runtime before calling `BLEPrinter.getDeviceList()` or connecting:
+
+```tsx
+import { Platform, PermissionsAndroid } from "react-native";
+
+export async function requestBluetoothPermission(): Promise<boolean> {
+  if (Platform.OS === "android") {
+    if (Platform.Version >= 31) {
+      const statuses = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+      ]);
+      return (
+        statuses[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] ===
+        PermissionsAndroid.RESULTS.GRANTED
+      );
+    } else {
+      const status = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      );
+      return status === PermissionsAndroid.RESULTS.GRANTED;
+    }
+  }
+  return true;
+}
 ```
 
 ---
